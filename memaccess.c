@@ -9,11 +9,16 @@
 #include "general.h"
 #include "QL_screen.h"
 #include "SDL2screen.h"
+#include <unistd.h>
 
 static int is_hw(uint32_t addr)
 {
-	if ((addr >= QL_INTERNAL_IO_BASE) &&
-        	(addr < (QL_INTERNAL_IO_BASE + QL_INTERNAL_IO_SIZE))) {
+	if (((addr >= QL_INTERNAL_IO_BASE) &&
+        	(addr < (QL_INTERNAL_IO_BASE + QL_INTERNAL_IO_SIZE))) ||
+		((addr >= QL_INTERNAL_MEM_BASE) &&
+			(addr < (QL_INTERNAL_MEM_BASE + QL_INTERNAL_MEM_SIZE))) ||
+		((addr >= 0x16000 && addr < 0x18000) ||
+	     (addr >= 0x15f10 && addr < 0x15f20))) {
 		return 1;
 	}
 
@@ -24,12 +29,11 @@ rw8 ReadByte(aw32 addr)
 {
 	addr &= ADDR_MASK;
 
+	if (is_hw(addr))
+		return ReadHWByte(addr);
+
 	if ((addr >= RTOP) && (addr >=qlscreen.qm_hi))
 		return 0;
-
-	if (is_hw(addr)) {
-		return ReadHWByte(addr);
-	}
 
 	return *((w8 *)memBase + addr);
 }
@@ -38,12 +42,11 @@ rw16 ReadWord(aw32 addr)
 {
 	addr &= ADDR_MASK;
 
+	if (is_hw(addr))
+		return ((w16)ReadHWWord(addr));
+
 	if ((addr >= RTOP) && (addr >=qlscreen.qm_hi))
 		return 0;
-
-	if (is_hw(addr)) {
-		return ((w16)ReadHWWord(addr));
-	}
 
 	return (w16)RW((w16 *)((Ptr)memBase + addr)); /* make sure it is signed */
 }
@@ -52,12 +55,11 @@ rw32 ReadLong(aw32 addr)
 {
 	addr &= ADDR_MASK;
 
+	if (is_hw(addr))
+		return ((w32)ReadHWLong(addr));
+
 	if ((addr >= RTOP) && (addr >=qlscreen.qm_hi))
 		return 0;
-
-	if (is_hw(addr)) {
-		return ((w32)ReadHWLong(addr));
-	}
 
 	return (w32)RL((Ptr)memBase + addr); /* make sure is is signed */
 }
@@ -65,42 +67,56 @@ rw32 ReadLong(aw32 addr)
 void WriteByte(aw32 addr,aw8 d)
 {
 	addr &= ADDR_MASK;
+	if (addr == 0xfffffe) {
+		write(1, &d, 1);
+		return;
+	} else if (addr == 0xffffff) {
+		write(2, &d, 1);
+		return;
+	}
+
+	if (is_hw(addr)) {
+		WriteHWByte(addr, d);
+		return;
+	}
 
 	if ((addr >= RTOP) && (addr >= qlscreen.qm_hi))
 		return;
 
-	if (is_hw(addr)) {
-		WriteHWByte(addr, d);
-	} else if (addr >= QL_SCREEN_BASE) {
+	if (addr >= QL_SCREEN_BASE)
 		*((w8 *)memBase + addr) = d;
-	}
 }
 
 void WriteWord(aw32 addr,aw16 d)
 {
 	addr &= ADDR_MASK;
 
-	if ((addr >= RTOP) && (addr >= qlscreen.qm_hi))
-		return;
-
 	if (is_hw(addr)) {
 		WriteHWWord(addr, d);
-	} else if (addr >= QL_SCREEN_BASE) {
-		WW((Ptr)memBase + addr, d);
+		return;
 	}
+
+	if ((addr >= RTOP) && (addr >= qlscreen.qm_hi))
+		return;
+	
+	if (addr >= QL_SCREEN_BASE)
+		WW((Ptr)memBase + addr, d);
 }
 
 void WriteLong(aw32 addr,aw32 d)
 {
 	addr &= ADDR_MASK;
 
-	if ((addr >= RTOP) && (addr >=qlscreen.qm_hi))
-		return;
-
 	if (is_hw(addr)) {
 		WriteHWWord(addr, d >> 16);
 		WriteHWWord(addr + 2, d);
-	} else if (addr >= QL_SCREEN_BASE) {
+		return;
+	}
+
+	if ((addr >= RTOP) && (addr >=qlscreen.qm_hi))
+		return;
+
+	if (addr >= QL_SCREEN_BASE) {
 		WL((Ptr)memBase + addr, d);
 	}
 }

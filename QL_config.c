@@ -204,6 +204,9 @@ int LoadMainRom(void) /* load and modify QL ROM */
 	uw32 a;
 	Cond p;
 
+#ifdef NEXTP8
+	return 0;
+#else
 	qemlPatch = false;
 
 	p = 1; /*ReasonableROM(memBase);*/
@@ -277,6 +280,7 @@ int LoadMainRom(void) /* load and modify QL ROM */
 	if (e == 0 && !p)
 		e = ERR_ROM_UNKNOWN;
 	return e;
+#endif
 }
 
 void save_regs(void *p)

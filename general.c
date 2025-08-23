@@ -14,9 +14,18 @@
 #include "sqlux_bdi.h"
 #include "dummies.h"
 #include "unixstuff.h"
+#include "SDL2screen.h"
+#include "QL_sound.h"
+#include "QL_screen.h"
+
+#ifdef NEXTP8
+#include "nextp8.h"
+#include "sdspi.h"
+#endif
 
 #include <signal.h>
 #include <time.h>
+#include <assert.h>
 
 #include "sqlux_debug.h"
 
@@ -245,9 +254,36 @@ void ipc_write(uint8_t d)
 
 void WriteHWByte(aw32 addr, aw8 d)
 {
-	/*printf("write HWreg at %x val=%x\n",addr-0x18000,d);*/
+	/*
+	if (!(addr >= _DA_MEMORY_BASE && addr < _DA_MEMORY_BASE + _DA_MEMORY_SIZE) &&
+        !(addr >= _FRAME_BUFFER_BASE && addr < _FRAME_BUFFER_BASE + _FRAME_BUFFER_SIZE) &&
+		!(addr >= _FRAME_BUFFER1_BASE && addr < _FRAME_BUFFER1_BASE + _FRAME_BUFFER_SIZE) &&
+		!(addr >= _FRAME_BUFFER2_BASE && addr < _FRAME_BUFFER2_BASE + _FRAME_BUFFER_SIZE))
+		printf("write HWreg at %x val=%x\n",addr,d);
+		*/
 
 	switch (addr) {
+#ifdef NEXTP8
+	case _POST_CODE:
+		printf("POST: %d\n", d);
+		break;
+	case _VFRONTREQ:
+		//printf("VFRONTREQ: %d\n", d);
+		vfrontreq = d & 1;
+		break;
+	case _SDSPI_CHIP_SELECT:
+		SDSPI_SetChipSelect(d);
+		break;
+	case _SDSPI_DATA_IN:
+		SDSPI_SetDataIn(d);
+		break;
+	case _SDSPI_DIVIDER:
+		SDSPI_SetDivider(d);
+		break;
+	case _SDSPI_WRITE_ENABLE:
+		SDSPI_SetWriteEnable(d);
+		break;
+#else
 	case 0x018063: /* Display control */
 		SetDisplay(d, true);
 	case 0x018000:
@@ -265,7 +301,7 @@ void WriteHWByte(aw32 addr, aw8 d)
 		break;
 	case 0x018003:
 		DEBUG_PRINT("Write to IPC link > %d\n", d);
-		DEBUG_PRINT("at (PC-2) %8.8x\n", (Ptr)pc - (Ptr)memBase - 2);
+		DEBUG_PRINT("at (PC-2) %8.8lx\n", (Ptr)pc - (Ptr)memBase - 2);
 		ipc_write(d);
 		break;
 	case 0x018020:
@@ -286,7 +322,37 @@ void WriteHWByte(aw32 addr, aw8 d)
 	case 0x018103:
 		SQLUXBDIDataWrite(d);
 		break;
+#endif
 	default:
+#ifdef NEXTP8
+		if (addr >= _DA_MEMORY_BASE && addr < _DA_MEMORY_BASE + _DA_MEMORY_SIZE) {
+			if ((addr & 1) == 0)
+				da_memory[addr >> 1] = (da_memory[addr >> 1] & 0xff) | (d << 8);
+			else
+				da_memory[addr >> 1] = (da_memory[addr >> 1] & 0xff00) | d;
+			return;
+		}
+		if (addr >= _BACK_BUFFER_BASE && addr < _BACK_BUFFER_BASE + _FRAME_BUFFER_SIZE) {
+			frameBuffer[1-vfront][addr - _BACK_BUFFER_BASE] = d;
+			return;
+		}
+		if (addr >= _FRONT_BUFFER_BASE && addr < _FRONT_BUFFER_BASE + _FRAME_BUFFER_SIZE) {
+			frameBuffer[vfront][addr - _FRONT_BUFFER_BASE] = d;
+			return;
+		}
+		if (addr >= _FRAME_BUFFER1_BASE && addr < _FRAME_BUFFER1_BASE + _FRAME_BUFFER_SIZE) {
+			frameBuffer[0][addr - _FRAME_BUFFER1_BASE] = d;
+			return;
+		}
+		if (addr >= _FRAME_BUFFER2_BASE && addr < _FRAME_BUFFER2_BASE + _FRAME_BUFFER_SIZE) {
+			frameBuffer[1][addr - _FRAME_BUFFER2_BASE] = d;
+			return;
+		}
+		if (addr >= _PALETTE_BASE && addr < _PALETTE_BASE + _PALETTE_SIZE) {
+			screenPalette[addr - _PALETTE_BASE] = d;
+			return;
+		}
+#endif
 		debug2("Write to HW register ", addr);
 		debug2("at (PC-2) ", (Ptr)pc - (Ptr)memBase - 2);
 		/*TRR;*/
@@ -302,9 +368,18 @@ rw8 ReadHWByte(aw32 addr)
 	struct timespec timer;
 	uint8_t ret_byte;
 
-	/*printf("read HWreg %x, ",addr-0x18000);*/
+	//printf("read HWreg %x, ",addr);
 
 	switch (addr) {
+#ifdef NEXTP8
+	case _VFRONT:
+		//printf("VFRONT: %d\n", vfront);
+		return vfront;
+	case _SDSPI_DATA_OUT:
+		return SDSPI_GetDataOut();
+	case _SDSPI_READY:
+		return SDSPI_GetReady();
+#else
 	case 0x018000: /* Read from real-time clock */
 	case 0x018001:
 	case 0x018002:
@@ -357,7 +432,31 @@ rw8 ReadHWByte(aw32 addr)
 		return (nanotime & 0xFF);
 		break;
 #endif
+#endif
 	default:
+#ifdef NEXTP8
+		if (addr >= _KEYBOARD_MATRIX &&
+			addr < _KEYBOARD_MATRIX + 0x20) {
+			// read from keyboard
+			return sdl_keyrow[addr - _KEYBOARD_MATRIX];
+		}
+		if (addr >= _DA_MEMORY_BASE && addr < _DA_MEMORY_BASE + _DA_MEMORY_SIZE) {
+			if ((addr & 1) == 0)
+				return da_memory[(addr - _DA_MEMORY_BASE) >> 1] >> 8;
+			else
+				return da_memory[(addr - _DA_MEMORY_BASE) >> 1] & 0xff;
+		}
+		if (addr >= _BACK_BUFFER_BASE && addr < _BACK_BUFFER_BASE + _FRAME_BUFFER_SIZE)
+			return frameBuffer[1-vfront][addr - _BACK_BUFFER_BASE] & 0xff;
+		if (addr >= _FRONT_BUFFER_BASE && addr < _FRONT_BUFFER_BASE + _FRAME_BUFFER_SIZE)
+			return frameBuffer[vfront][addr - _BACK_BUFFER_BASE] & 0xff;
+		 if (addr >= _FRAME_BUFFER1_BASE && addr < _FRAME_BUFFER1_BASE + _FRAME_BUFFER_SIZE)
+			return frameBuffer[0][addr - _FRAME_BUFFER1_BASE] & 0xff;
+		if (addr >= _FRAME_BUFFER2_BASE && addr < _FRAME_BUFFER2_BASE + _FRAME_BUFFER_SIZE)
+			return frameBuffer[1][addr - _FRAME_BUFFER2_BASE] & 0xff;
+		if (addr >= _PALETTE_BASE && addr < _PALETTE_BASE + _PALETTE_SIZE)
+			return screenPalette[addr - _PALETTE_BASE] & 0xff;
+#endif
 		debug2("Read from HW register ", addr);
 		debug2("at (PC-2) ", (Ptr)pc - (Ptr)memBase - 2);
 		break;
@@ -366,30 +465,92 @@ rw8 ReadHWByte(aw32 addr)
 	return res;
 }
 
+static uint16_t utbuf_1mhz, utbuf_1khz;
+
 rw16 ReadHWWord(aw32 addr)
 {
 	switch (addr) {
+#ifdef NEXTP8
+	case _DA_CONTROL:
+		return da_address;
+	case _UTIMER_1MHZ_HI: {
+		struct timespec ts;
+		clock_gettime(CLOCK_MONOTONIC, &ts);
+		uint32_t utimer_1mhz = ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+		utbuf_1mhz = utimer_1mhz & 0xffff;
+		return (utimer_1mhz >> 16) & 0xffff;
+	}
+	case _UTIMER_1MHZ_LO:
+		return utbuf_1mhz;
+	case _UTIMER_1KHZ_HI: {
+		struct timespec ts;
+		clock_gettime(CLOCK_MONOTONIC, &ts);
+		uint32_t utimer_1khz = ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+		utbuf_1khz = utimer_1khz & 0xffff;
+		return (utimer_1khz >> 16) & 0xffff;
+	}
+	case _UTIMER_1KHZ_LO:
+		return utbuf_1khz;
+#else
 	case 0x018108:
 		return SQLUXBDISizeHigh();
 		break;
 	case 0x01810A:
 		return SQLUXBDISizeLow();
 		break;
+#endif
 	default:
+#ifdef NEXTP8
+		if (addr >= _DA_MEMORY_BASE && addr < _DA_MEMORY_BASE + _DA_MEMORY_SIZE) {
+#if __BYTE_ORDER == __BIG_ENDIAN
+			return da_memory[(addr - _DA_MEMORY_BASE) >> 1];
+#else
+			return __builtin_bswap16(da_memory[(addr - _DA_MEMORY_BASE) >> 1]);
+#endif
+		}
+#endif
 		return ((w16)ReadHWByte(addr) << 8) | (uw8)ReadHWByte(addr + 1);
 	}
 }
 
 void WriteHWWord(aw32 addr, aw16 d)
 {
+	if (!(addr >= _DA_MEMORY_BASE && addr < _DA_MEMORY_BASE + _DA_MEMORY_SIZE) &&
+        !(addr >= _BACK_BUFFER_BASE && addr < _BACK_BUFFER_BASE + _FRAME_BUFFER_SIZE) &&
+		!(addr >= _FRAME_BUFFER1_BASE && addr < _FRAME_BUFFER1_BASE + _FRAME_BUFFER_SIZE) &&
+		!(addr >= _FRAME_BUFFER2_BASE && addr < _FRAME_BUFFER2_BASE + _FRAME_BUFFER_SIZE) &&
+		!(addr >= _PALETTE_BASE && addr < _PALETTE_BASE + _PALETTE_SIZE))
+		printf("WriteHWWord: %lx\n", (unsigned long) addr);
 	switch (addr) {
+#ifdef NEXTP8
+	case _DA_CONTROL:
+		da_start = d & 1;
+		da_mono = (d >> 8) & 1;
+		printf("da_start = %u da_mono = %u\n", da_start, da_mono);
+		break;
+	case _DA_PERIOD:
+		da_period = d & 0xfff;
+		printf("da_period = %u\n", da_period);
+		break;
+#else
 	case 0x018104:
 		SQLUXBDIAddressHigh(d);
 		break;
 	case 0x018106:
 		SQLUXBDIAddressLow(d);
 		break;
+#endif
 	default:
+#ifdef NEXTP8
+		if (addr >= _DA_MEMORY_BASE && addr < _DA_MEMORY_BASE + _DA_MEMORY_SIZE) {
+#if __BYTE_ORDER == __BIG_ENDIAN
+			da_memory[(addr - _DA_MEMORY_BASE) >> 1] = d;
+#else
+			da_memory[(addr - _DA_MEMORY_BASE) >> 1] = __builtin_bswap16(d);
+#endif
+			return;
+		}
+#endif
 		WriteByte(addr, d >> 8);
 		WriteByte(addr + 1, d & 255);
 	}
@@ -401,6 +562,7 @@ aw32 ReadHWLong(aw32 addr)
 	struct timespec timer;
 
 	switch(addr) {
+#ifndef NEXTP8
 #ifndef WINXP_COMPAT
 	case 0x01C060:
 		clock_gettime(CLOCK_MONOTONIC, &timer);
@@ -409,6 +571,7 @@ aw32 ReadHWLong(aw32 addr)
 		nanotime &= 0xFFFFFFFF;
 		return nanotime;
 		break;
+#endif
 #endif
 	default:
 		return ((w32)ReadWord(addr) << 16) | (uw16)ReadWord(addr + 2);

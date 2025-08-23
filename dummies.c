@@ -37,7 +37,7 @@ printf("%s\n",msg);
 void debug2(char *msg, long n)
 {
 #ifdef DEBUG
- printf("%s\t%x\n",msg,n);
+ printf("%s\t%lx\n",msg,n);
 #endif
 }
 

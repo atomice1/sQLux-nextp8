@@ -1,5 +1,6 @@
 /* Sound updated for SDL2 */
 #include <SDL.h>
+#include <assert.h>
 #include <stdio.h>
 #include "debug.h"
 #include "QL68000.h"
@@ -73,14 +74,30 @@ static void silenceBuffer(int start, Sint8* buffer, int len);
 #define UNUSED(x) (void)(x)
 #define TICK_8049 22917		// Number of IPC ticks per second
 
+#ifdef NEXTP8
+#define FREQUENCY 44100		// Requested sampling frequency
+#define SAMPLES 512		// Number of samples in a callback
+#else
 #define FREQUENCY 24000		// Requested sampling frequency
 #define SAMPLES 256		// Number of samples in a callback
+#endif
 #define MAX_IPC_PARAMS 16 	// For the case where all 16 slots yield 8 bits
 
+#ifdef NEXTP8
+bool da_start = 0;
+bool da_mono = 0;
+uint16_t da_period = 0;
+int16_t da_memory[DA_SAMPLES];
+unsigned da_address = 0;
+#endif
+
 void initSound(int volume) {
+	//printf("initSound\n");
 	if ((volume != 0) && (!sound_enabled)) {
+		//printf("A\n");
 		// Create the sound driver
 		if(SDL_Init(SDL_INIT_AUDIO)) {
+			//printf("B\n");
 			if (V1) {
 				printf("Audio Failed to initialize: %s\n", SDL_GetError());
 			}
@@ -89,12 +106,17 @@ void initSound(int volume) {
 
 		SDL_zero(want);
 		want.freq = FREQUENCY;
+#ifdef NEXTP8
+		want.format = AUDIO_S16SYS;
+#else
 		want.format = AUDIO_S8;
+#endif
 		want.channels = 1;
 		want.samples = SAMPLES;
 		want.callback = audioCallback;
 
 		QLSDLAudio = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
+		//printf("called OpenAudio\n");
 
 		if(!QLSDLAudio) {
 			if (V1) {
@@ -116,6 +138,10 @@ void initSound(int volume) {
 		sound.in_use = -1; 		// index in use by callback (-1 = none)
 		sound.last_written = -1;	// index last written by by BeepSound (-1 = None)
 		sound_enabled = true;
+
+#ifdef NEXTP8
+		SDL_PauseAudioDevice(QLSDLAudio, 0);
+#endif
 	}
 	return;
 }
@@ -249,6 +275,32 @@ void KillSound() {
 	}
 }
 
+#ifdef NEXTP8
+static int min(int a, int b) {
+	if (a < b)
+		return a;
+	else
+		return b;
+}
+void audioCallback(void* userdata, Uint8* stream, int len) {
+	UNUSED(userdata);
+	int16_t *samples = (int16_t *)stream;
+	while (len > 0) {
+		int next_chunk = min(len, (DA_SAMPLES - da_address) * sizeof(int16_t));
+#if __BYTE_ORDER == __BIG_ENDIAN
+		memcpy(samples, da_memory + da_address, next_chunk);
+		da_address += next_chunk / sizeof(int16_t);
+#else
+		for (int i=0;i<next_chunk / sizeof(int16_t);++i)
+			*samples++ = __builtin_bswap16(da_memory[da_address++]);
+#endif
+		len -= next_chunk;
+		assert(da_address <= DA_SAMPLES);
+		if (da_address == DA_SAMPLES)
+			da_address -= DA_SAMPLES;
+	}
+}
+#else
 void audioCallback(void* userdata, Uint8* stream, int len) {
 	UNUSED(userdata);
 
@@ -339,6 +391,7 @@ void audioCallback(void* userdata, Uint8* stream, int len) {
 		while (written < len);
 	}
 }
+#endif
 
 static void getNewPitch() {
 	int change = sound.beep[sound.in_use].grd_y;

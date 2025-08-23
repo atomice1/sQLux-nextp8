@@ -76,6 +76,23 @@ struct QLcolor {
 	int b;
 };
 
+#ifdef NEXTP8
+struct QLcolor p8colors[32] = {
+	{ 0x00, 0x00, 0x00 }, { 0x1D, 0x2B, 0x53 }, { 0x7E, 0x25, 0x53 },
+	{ 0x00, 0x87, 0x51 }, { 0xAB, 0x52, 0x36 }, { 0x5F, 0x57, 0x4F },
+	{ 0xC2, 0xC3, 0xC7 }, { 0xFF, 0xF1, 0xE8 }, { 0xFF, 0x00, 0x4D },
+	{ 0xFF, 0xA3, 0x00 }, { 0xFF, 0xEC, 0x27 }, { 0x00, 0xE4, 0x36 },
+	{ 0x29, 0xAD, 0xFF }, { 0x83, 0x76, 0x9C }, { 0xFF, 0x77, 0xA8 },
+	{ 0xFF, 0xCC, 0xAA }, { 0x29, 0x18, 0x14 }, { 0x11, 0x1D, 0x35 },
+	{ 0x42, 0x21, 0x36 }, { 0x12, 0x53, 0x59 }, { 0x74, 0x2F, 0x29 },
+	{ 0x49, 0x33, 0x3B }, { 0xA2, 0x88, 0x79 }, { 0xF3, 0xEF, 0x7D },
+    { 0xBE, 0x12, 0x50 }, { 0xFF, 0x6C, 0x24 }, { 0xA8, 0xE7, 0x2E },
+	{ 0x00, 0xB5, 0x4E }, { 0x06, 0x5A, 0xB5 }, { 0x75, 0x46, 0x65 },
+	{ 0xFF, 0x6E, 0x59 }, { 0xFF, 0x9D, 0x81 }
+};
+
+uint32_t SDLcolors[32];
+#else
 struct QLcolor QLcolors[16] = {
 	{ 0x00, 0x00, 0x00 }, { 0x00, 0x00, 0xFF }, { 0xFF, 0x00, 0x00 },
 	{ 0xFF, 0x00, 0xFF }, { 0x00, 0xFF, 0x00 }, { 0x00, 0xFF, 0xFF },
@@ -104,6 +121,7 @@ struct QLcolor QLcolors_gray[16] = {
 };
 
 uint32_t SDLcolors[16];
+#endif
 
 struct SDLQLMap {
 	SDL_Keycode sdl_kc;
@@ -348,7 +366,11 @@ void QLSDLScreen(void)
 	uint32_t sdl_window_mode;
 	int i, w, h;
 	double ay;
+#ifdef NEXTP8
+        const char *sysrom = emulatorOptionString("rom1");
+#else
 	const char *sysrom = emulatorOptionString("sysrom");
+#endif
 	const char *win_size, *shader_str;
 
 	snprintf(sdl_win_name, 128, "sQLux - %s, %dK", sysrom, RTOP / 1024);
@@ -369,6 +391,9 @@ void QLSDLScreen(void)
 		printf("Video Driver %s xres %d yres %d\n", sdl_video_driver,
 		       sdl_mode.w, sdl_mode.h);
 
+#ifdef NEXTP8
+	ql_screen_ratio = 1.0;
+#else
 	/* Fix the aspect ratio to more like real hardware
 	   Note 1.355 is the ratio used in QL Roms (see Minerva disassembly) */
 	int aspect = emulatorOptionInt("fixaspect");
@@ -379,6 +404,7 @@ void QLSDLScreen(void)
 	} else {
 		ql_screen_ratio = 1.0;
 	}
+#endif
 
 	/* Ensure width and height are always initialised to sane values */
 	ay = (double)(qlscreen.yres * ql_screen_ratio);
@@ -484,6 +510,7 @@ static bool QLSDLCreateDisplay(int w, int h, int ly, uint32_t *id,
 		return false;
 	}
 
+	printf("w: %d h :%d\n", ql_screen->w, ql_screen->h);
 	ql_texture = SDL_CreateTexture(ql_renderer, SDL_PIXELFORMAT_RGBA32,
 				       SDL_TEXTUREACCESS_STREAMING,
 				       ql_screen->w, ql_screen->h);
@@ -525,6 +552,12 @@ void QLSDLCreateIcon(SDL_Window *window)
 
 void QLSDLCreatePalette(const SDL_PixelFormat *format)
 {
+#ifdef NEXTP8
+	for (int i = 0; i < 32; i++) {
+		SDLcolors[i] = SDL_MapRGB(format, p8colors[i].r,
+						  p8colors[i].g,
+						  p8colors[i].b);
+#else
 	int option = emulatorOptionInt("palette");
 	for (int i = 0; i < 16; i++) {
 		if (option == 2) {
@@ -539,11 +572,19 @@ void QLSDLCreatePalette(const SDL_PixelFormat *format)
 			SDLcolors[i] = SDL_MapRGB(format, QLcolors[i].r,
 						  QLcolors[i].g, QLcolors[i].b);
 		}
+#endif
 	}
 }
 
 // frame counter for flash
 static int curframe = 0;
+
+#ifdef NEXTP8
+static inline int color_index(uint8_t c)
+{
+    return ((c >> 3) & 0x10) | (c & 0xf);
+}
+#endif
 
 static void emulatorUpdatePixelBufferQL(uint32_t *pixelPtr32,
 					uint8_t *emulatorScreenPtr,
@@ -554,6 +595,15 @@ static void emulatorUpdatePixelBufferQL(uint32_t *pixelPtr32,
 	int flashon = 0;
 
 	while (emulatorScreenPtr < emulatorScreenPtrEnd) {
+#ifdef NEXTP8
+		uint8_t t = *emulatorScreenPtr++;
+		uint8_t lo_index = t & 0xf;
+		uint8_t hi_index = (t >> 4) & 0xf;
+		uint32_t lo_colour = SDLcolors[color_index(screenPalette[lo_index])];
+		uint32_t hi_colour = SDLcolors[color_index(screenPalette[hi_index])];
+		*pixelPtr32++ = lo_colour;
+		*pixelPtr32++ = hi_colour;
+#else		
 		uint8_t t1 = *emulatorScreenPtr++;
 		uint8_t t2 = *emulatorScreenPtr++;
 
@@ -611,6 +661,7 @@ static void emulatorUpdatePixelBufferQL(uint32_t *pixelPtr32,
 			}
 			break;
 		}
+#endif
 	}
 
 	// frame counter for flash
@@ -624,11 +675,24 @@ static void QLSDLUpdatePixelBuffer()
 		SDL_LockSurface(ql_screen);
 	}
 
+#ifdef NEXTP8
+	uint8_t *emulatorScreenPtr = (uint8_t *)&frameBuffer[vfront];
+#else
 	uint8_t *emulatorScreenPtr = (uint8_t *)memBase + qlscreen.qm_lo;
+#endif
 	uint8_t *emulatorScreenPtrEnd = emulatorScreenPtr + qlscreen.qm_len;
 
 	emulatorUpdatePixelBufferQL(ql_screen->pixels, emulatorScreenPtr,
 				    emulatorScreenPtrEnd);
+
+#ifdef NEXTP8
+	/*if (vfront != vfrontreq) {
+		printf("flip: vfrontreq=%d vfront=%d->%d\n", vfrontreq, vfront, vfrontreq);
+		fflush(stdout);
+	}
+	*/
+	vfront = vfrontreq;
+#endif
 
 	if (SDL_MUSTLOCK(ql_screen)) {
 		SDL_UnlockSurface(ql_screen);
@@ -638,11 +702,24 @@ static void QLSDLUpdatePixelBuffer()
 // Needed for the shader code
 void QLSDLWritePixels(uint32_t *pixelPtr32)
 {
+#ifdef NEXTP8
+	//printf("QLSDLWritePixels: vfront = %d\n", vfront);
+	uint8_t *emulatorScreenPtr = (uint8_t *)&frameBuffer[vfront];
+#else
 	uint8_t *emulatorScreenPtr = (uint8_t *)memBase + qlscreen.qm_lo;
+#endif
 	uint8_t *emulatorScreenPtrEnd = emulatorScreenPtr + qlscreen.qm_len;
 
 	emulatorUpdatePixelBufferQL(pixelPtr32, emulatorScreenPtr,
 				    emulatorScreenPtrEnd);
+
+#ifdef NEXTP8
+	if (vfront != vfrontreq) {
+		printf("flip: vfrontreq=%d vfront=%d->%d\n", vfrontreq, vfront, vfrontreq);
+		fflush(stdout);
+	}
+	vfront = vfrontreq;
+#endif
 }
 
 void QLSDLRenderScreen(void)
@@ -743,14 +820,25 @@ static void QLSDLOpenJoystick(int index, int which)
 }
 
 /* Store the keys pressed */
+#ifdef NEXTP8
+unsigned int sdl_keyrow[32] = { 0, 0, 0, 0, 0, 0, 0, 0,
+							    0, 0, 0, 0, 0, 0, 0, 0,
+							    0, 0, 0, 0, 0, 0, 0, 0,
+							    0, 0, 0, 0, 0, 0, 0, 0 };
+#else
 unsigned int sdl_keyrow[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+#endif
 int sdl_shiftstate, sdl_controlstate, sdl_altstate, sdl_grfstate;
 int usegrfstate = 0;
 
 static void SDLQLKeyrowChg(int code, int press)
 {
 	code &= 0xff; // Make sure that array bounds are not exceeded
+#ifdef NEXTP8
+	int row = code / 8;
+#else
 	int row = 7 - code / 8;
+#endif
 	int col = 0x1 << (code % 8);
 
 	if (press)
@@ -769,6 +857,7 @@ static void SDLQLKeyrowChg(int code, int press)
 
 // Note this is the Windows keymap. Modified from MacOS with no test
 static struct SDLQLMap_f sdlqlmap_DE[] = {
+#ifndef NEXTP8
 	// These should be valid for all platforms
 	{ MOD_WILD, SDLK_z, QL_Y }, // Y	OK
 	{ MOD_WILD, SDLK_y, QL_Z }, // Z	OK
@@ -797,12 +886,13 @@ static struct SDLQLMap_f sdlqlmap_DE[] = {
 	{ MOD_ALT, SDLK_0, (SWAP_ALT | SWAP_CNTRL | QL_EQUAL) }, // }	OK
 	{ MOD_ALT, SDLK_PLUS, (SWAP_CNTRL | QL_COMMA) }, // ~	OK
 	{ MOD_ALT, SDLK_2, (SWAP_CNTRL | QL_BACKSLASH) }, // @	OK
-
+#endif
 	{ 0x0, 0x0, 0x0 }
 };
 
 // This is the MacOS keymap. Mostly identical with the Windows one
 static struct SDLQLMap_f sdlqlmap_DE_MacOS[] = {
+#ifndef NEXTP8
 	// These should be valid for all platforms
 	{ MOD_WILD, SDLK_z, QL_Y }, // Y	OK
 	{ MOD_WILD, SDLK_y, QL_Z }, // Z	OK
@@ -832,11 +922,12 @@ static struct SDLQLMap_f sdlqlmap_DE_MacOS[] = {
 	{ MOD_ALT, SDLK_n,
 	  (SWAP_ALT | SWAP_CNTRL | QL_BACKSLASH) }, // ~	OK
 	{ MOD_ALT, SDLK_l, (SWAP_ALT | SWAP_CNTRL | QL_COMMA) }, // @	NOK
-
+#endif
 	{ 0x0, 0x0, 0x0 }
 };
 
 static struct SDLQLMap_f sdlqlmap_DE_ch[] = {
+#ifndef NEXTP8
 	{ MOD_NONE, 167, (SWAP_SHIFT | SWAP_CNTRL | QL_V) }, // §
 	{ MOD_SHIFT, 167, (SWAP_CNTRL | QL_Z) }, // °
 	{ MOD_SHIFT, SDLK_1, QL_EQUAL }, // +
@@ -875,10 +966,12 @@ static struct SDLQLMap_f sdlqlmap_DE_ch[] = {
 	{ MOD_NONE, SDLK_MINUS, QL_MINUS }, // -
 	{ MOD_NONE, SDLK_KP_PLUS, (SWAP_SHIFT | QL_EQUAL) },
 	{ MOD_NONE, SDLK_KP_MULTIPLY, (SWAP_SHIFT | QL_8) },
+#endif	
 	{ 0x0, 0x0, 0x0 }
 };
 
 static struct SDLQLMap_f sdlqlmap_GB[] = {
+#ifndef NEXTP8
 	{ MOD_NONE, SDLK_BACKQUOTE, (SWAP_SHIFT | QL_3) }, // For UK Mac
 	{ MOD_SHIFT, SDLK_3, (SWAP_SHIFT | QL_POUND) },
 	{ MOD_SHIFT, SDLK_QUOTE, QL_2 },
@@ -887,10 +980,12 @@ static struct SDLQLMap_f sdlqlmap_GB[] = {
 	{ MOD_SHIFT, SDLK_HASH, QL_POUND },
 	{ MOD_NONE, SDLK_KP_PLUS, (SWAP_SHIFT | QL_EQUAL) },
 	{ MOD_NONE, SDLK_KP_MULTIPLY, (SWAP_SHIFT | QL_8) },
+#endif
 	{ 0x0, 0x0, 0x0 }
 };
 
 static struct SDLQLMap_f sdlqlmap_ES[] = {
+#ifndef NEXTP8
 	{ MOD_SHIFT, SDLK_1, QLSH_PERIOD }, // !
 	{ MOD_SHIFT, SDLK_2, (QL_LBRACKET) }, // "
 	{ MOD_SHIFT, SDLK_3, (SWAP_SHIFT | QL_PERIOD) }, // .
@@ -932,10 +1027,12 @@ static struct SDLQLMap_f sdlqlmap_ES[] = {
 	{ MOD_NONE, SDLK_KP_DIVIDE, (SWAP_SHIFT | QL_6) },
 	{ MOD_NONE, SDLK_KP_PLUS, (SWAP_SHIFT | QL_EQUAL) },
 	{ MOD_NONE, SDLK_KP_MULTIPLY, (SWAP_SHIFT | QL_8) },
+#endif
 	{ 0x0, 0x0, 0x0 }
 };
 
 static struct SDLQLMap_f sdlqlmap_IT[] = {
+#ifndef NEXTP8
 	{ MOD_SHIFT, SDLK_0, (SWAP_SHIFT | QL_EQUAL) },
 	{ MOD_SHIFT, SDLK_9, (QLSH_0) },
 	{ MOD_SHIFT, SDLK_8, (QLSH_9) },
@@ -967,9 +1064,52 @@ static struct SDLQLMap_f sdlqlmap_IT[] = {
 	{ MOD_NONE, 249,
 	  (SWAP_CNTRL |
 	   QL_9) }, // wrong accented 'u' - couldn't find how to reproduce it from the international QL keymap
+#endif
 	{ 0x0, 0x0, 0x0 }
 };
 
+#ifdef NEXTP8
+static struct SDLQLMap sdlqlmap_default[] = { { SDLK_LEFT, 235 },
+					      { SDLK_UP, 245 },
+					      { SDLK_RIGHT, 244 },
+					      { SDLK_DOWN, 242 },
+
+					      { SDLK_TAB, 13 },
+
+						  { SDLK_LSHIFT, 18 },
+
+					      { SDLK_a, 28 },
+					      { SDLK_b, 50 },
+					      { SDLK_c, 33 },
+					      { SDLK_d, 35 },
+					      { SDLK_e, 36 },
+					      { SDLK_f, 43 },
+					      { SDLK_g, 52 },
+					      { SDLK_h, 51 },
+					      { SDLK_i, 67 },
+					      { SDLK_j, 59 },
+					      { SDLK_k, 66 },
+					      { SDLK_l, 75 },
+					      { SDLK_m, 58 },
+					      { SDLK_n, 49 },
+					      { SDLK_o, 68 },
+					      { SDLK_p, 77 },
+					      { SDLK_q, 21 },
+					      { SDLK_r, 45 },
+					      { SDLK_s, 27 },
+					      { SDLK_t, 44 },
+					      { SDLK_u, 60 },
+					      { SDLK_v, 42 },
+					      { SDLK_w, 29 },
+					      { SDLK_x, 34 },
+					      { SDLK_y, 53 },
+					      { SDLK_z, 26 },
+
+						  { SDLK_RETURN, 0x5a },
+						  { SDLK_ESCAPE, 0x76 },
+
+					      { 0x0, 0x0 } };
+#else
 static struct SDLQLMap sdlqlmap_default[] = { { SDLK_LEFT, QL_LEFT },
 					      { SDLK_UP, QL_UP },
 					      { SDLK_RIGHT, QL_RIGHT },
@@ -1052,6 +1192,7 @@ static struct SDLQLMap sdlqlmap_default[] = { { SDLK_LEFT, QL_LEFT },
 					      { SDLK_KP_0, QL_0 },
 					      { SDLK_KP_PERIOD, QL_PERIOD },
 					      { 0x0, 0x0 } };
+#endif
 
 void QLSDProcessKey(SDL_Keysym *keysym, int pressed)
 {

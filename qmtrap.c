@@ -47,8 +47,10 @@ void QLchunk(uw16 *oldPC,long n)       /* execute n emulated 68K istructions */
   uw16 savePOLLM;
   int save_ninst;
 
+#ifndef NEXTP8
   savePOLLM=ReadWord(0x28030);
   WriteWord(0x28030,0);
+#endif
 
   if((uintptr_t)pc&1) return;
 
@@ -70,7 +72,9 @@ void QLchunk(uw16 *oldPC,long n)       /* execute n emulated 68K istructions */
   QMExecuteLoop(oldPC);
 
   nInst=save_ninst;
+#ifndef NEXTP8
   WriteWord(0x28030,savePOLLM);
+#endif
 }
 
 void QLtrap(int t,int id,int nMax)

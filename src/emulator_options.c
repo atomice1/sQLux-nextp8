@@ -17,10 +17,14 @@
 static const char * const helpTextInit = "\n\
 Usage: sqlux [OPTIONS] [args...]\n\
 \n\
-Positionals:\n\
+nextp8 software model\n\
+\n"
+#ifndef NEXTP8
+"Positionals:\n\
   args                        Arguments passed to QDOS\n\
-\n\
-Options:\n\
+\n"
+#endif
+"Options:\n\
   -h,--help                   Print this help message and exit\n\
   -f,--config [sqlux.ini]     Read an ini file\n";
 
@@ -44,39 +48,62 @@ struct emuOpts {
 };
 
 struct emuOpts emuOptions[] = {
+#ifndef NEXTP8
 {"bdi1", "", "file exposed by the BDI interface", EMU_OPT_CHAR, 0 , NULL},
 {"boot_cmd", "b", "command to run on boot (executed in basic)", EMU_OPT_CHAR, 0, NULL},
 {"boot_device", "d", "device to load BOOT file from", EMU_OPT_CHAR, 0, "mdv1"},
+#endif
+{"cart", "", "p8 cart", EMU_OPT_CHAR, 0, NULL},
+#ifndef NEXTP8
 {"cpu_hog", "", "1 = use all cpu, 0 = sleep when idle", EMU_OPT_INT, 1, NULL},
 {"device", "", "QDOS_name,path,flags (may be used multiple times", EMU_OPT_DEV, 0, NULL},
 {"fast_startup", "", "1 = skip ram test (does not affect Minerva)", EMU_OPT_INT, 0, NULL},
+#endif
 {"filter", "", "enable bilinear filter when zooming", EMU_OPT_INT, 0, NULL},
+#ifndef NEXTP8
 {"fixaspect", "", "0 = 1:1 pixel mapping, 1 = 2:3 non square pixels, 2 = BBQL aspect non square pixels", EMU_OPT_INT, 0, NULL},
 {"iorom1", "", "rom in 1st IO area (Minerva only 0x10000 address)", EMU_OPT_CHAR, 0, NULL},
 {"iorom2", "", "rom in 2nd IO area (Minerva only 0x14000 address)", EMU_OPT_CHAR, 0, NULL},
+#endif
 {"joy1", "", "1-8 SDL2 joystick index", EMU_OPT_INT, 0, NULL},
 {"joy2", "", "1-8 SDL2 joystick index", EMU_OPT_INT, 0, NULL},
 {"kbd", "", "keyboard language DE, GB, ES, IT, US", EMU_OPT_CHAR, 0, "US"},
-{"no_patch", "n", "disable patching the rom", EMU_OPT_INT, 0, NULL},
+#ifndef NEXTP8
+{"no_patch", "n", "disable patching the rom", EMU_OPT_INT, 1, NULL},
 {"palette", "", "0 = Full colour, 1 = Unsaturated colours (slightly more CRT like), 2 =  Enable grayscale display", EMU_OPT_INT, 0, NULL},
 {"print", "", "command to use for print jobs", EMU_OPT_CHAR, 0, "lpr"},
-{"ramtop", "r", "The memory space top (128K + QL ram, not valid if ramsize set)", EMU_OPT_INT, 256, NULL},
+#endif
+#ifdef NEXTP8
+{"ramtop", "r", "The memory space top (not valid if ramsize set)", EMU_OPT_INT, 2048, NULL},
+#else
+{"ramtop", "r", "The memory space top (128K + QL ram, not valid if ramsize set)", EMU_OPT_INT, 2048, NULL},
+#endif
 {"ramsize", "", "The size of ram", EMU_OPT_INT, 0, NULL},
 {"resolution", "g", "resolution of screen in mode 4", EMU_OPT_CHAR, 0, "512x256"},
+#ifdef NEXTP8
+{"rom1", "", "rom 1", EMU_OPT_CHAR, 0, "rom.bin"},
+{"rom2", "", "rom 2", EMU_OPT_CHAR, 0, ""},
+#endif
 {"romdir", "", "path to the roms", EMU_OPT_CHAR, 0, "roms"},
+#ifndef NEXTP8
 {"romport", "", "rom in QL rom port (0xC000 address)", EMU_OPT_CHAR, 0, NULL},
 {"romim", "", "rom in QL rom port (0xC000 address, legacy alias for romport)", EMU_OPT_CHAR, 0, NULL},
 {"ser1", "", "device for ser1", EMU_OPT_CHAR, 0, NULL},
 {"ser2", "", "device for ser2", EMU_OPT_CHAR, 0, NULL},
 {"ser3", "", "device for ser3", EMU_OPT_CHAR, 0, NULL},
 {"ser4", "", "device for ser4", EMU_OPT_CHAR, 0, NULL},
+#endif
 {"shader", "", "0 = Disabled, 1 = Use flat shader, 2 = Use curved shader", EMU_OPT_INT, 0, NULL},
 {"shader_file", "", "Path to shader file to use if SHADER is 1 or 2", EMU_OPT_CHAR, 0, "shader.glsl"},
+#ifndef NEXTP8
 {"skip_boot", "", "1 = skip f1/f2 screen, 0 = show f1/f2 screen", EMU_OPT_INT, 1, NULL},
-{"sound", "", "volume in range 1-8, 0 to disable", EMU_OPT_INT, 0, NULL},
+#endif
+{"sound", "", "volume in range 1-8, 0 to disable", EMU_OPT_INT, 8, NULL},
 {"speed", "", "speed in factor of BBQL speed, 0.0 for full speed", EMU_OPT_CHAR, 0, "0.0"},
 {"strict_lock", "", "enable strict file locking", EMU_OPT_INT, 0, NULL},
+#ifndef NEXTP8
 {"sysrom", "", "system rom", EMU_OPT_CHAR, 0, "MIN198.rom"},
+#endif
 {"win_size", "w", "window size 1x, 2x, 3x, max, full", EMU_OPT_CHAR, 0, "1x"},
 {"verbose", "v", "verbosity level 0-3", EMU_OPT_INT, 1, NULL},
 {NULL},
@@ -383,6 +410,7 @@ int emulatorOptionParse(int argc, char **argv)
 		exit(1);
 	}
 
+#ifndef NEXTP8
 	for (i = 0; i < ap_count(parser, "device"); i++) {
 		int count;
 		const char *device = ap_get_str_value_at_index(parser, "device", i);
@@ -390,6 +418,7 @@ int emulatorOptionParse(int argc, char **argv)
 		deviceInstall(splitDevice, count);
 		sdsfreesplitres(splitDevice, count);
 	}
+#endif
 	configFile = ap_get_str_value(parser, "config");
 
 	if (ini_parse(configFile, iniHandler, NULL) < 0) {

@@ -236,7 +236,11 @@ void sf(void)
 
 void stop(void)
 {
+	uw16 imm = (w16)RW(pc++);
+	printf("stop #0x%x\n", (unsigned)imm);
+	DumpState();
 	pc++;
+	imm = RW(pc - 1);
 	if (supervisor) {
 		PutSR(RW(pc - 1));
 		if (exception == 0) /* to avoid mess with interrupts */

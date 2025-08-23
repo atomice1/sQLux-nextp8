@@ -22,7 +22,11 @@ void QLSDLWritePixels(uint32_t *pixelPtr32);
 void QLSDLCreatePalette(const SDL_PixelFormat *format);
 void QLSDLCreateIcon(SDL_Window *window);
 
+#ifdef NEXTP8
+extern unsigned int sdl_keyrow[32];
+#else
 extern unsigned int sdl_keyrow[8];
+#endif
 extern int sdl_shiftstate, sdl_controlstate, sdl_altstate;
 
 extern SDL_atomic_t doPoll;

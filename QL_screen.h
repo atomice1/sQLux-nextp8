@@ -19,3 +19,8 @@ extern screen_specs qlscreen;
 
 void QLPatchPTRENV(void);
 
+#ifdef NEXTP8
+extern uint8_t frameBuffer[2][8192];
+extern uint8_t screenPalette[16];
+extern int vfront, vfrontreq;
+#endif

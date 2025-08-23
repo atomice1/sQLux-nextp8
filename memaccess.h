@@ -27,15 +27,23 @@ void RewriteEA_l(int32_t d);
 void rwl_acc(int32_t d);
 
 #define QL_ROM_BASE             0x0000
-#define QL_ROM_SIZE             0xC000
+#define QL_ROM_SIZE             0x80000
 #define QL_ROM_PORT_BASE        0xC000
 #define QL_ROM_PORT_SIZE        0x4000
 #define QL_ROM2_BASE            0x10000
 #define QL_ROM2_SIZE            0x4000
 #define QL_ROM3_BASE            0x14000
 #define QL_ROM3_SIZE            0x4000
-#define QL_INTERNAL_IO_BASE     0x18000
-#define QL_INTERNAL_IO_SIZE     0x4000
-#define QL_EXTERNAL_IO_BASE     0x1C000
+#define QL_INTERNAL_IO_BASE     0x800000
+#define QL_INTERNAL_IO_SIZE     0x100000
+#define QL_INTERNAL_MEM_BASE    0xc00000
+#define QL_INTERNAL_MEM_SIZE    0x100000
+#define QL_EXTERNAL_IO_BASE     0x21C000
 #define QL_EXTERNAL_IO_SIZE     0x4000
-#define QL_SCREEN_BASE          0x20000
+#ifdef NEXTP8
+#define QL_SCREEN_BASE          0x10000
+#else
+#define QL_SCREEN_BASE          0x80000
+#endif
+#define CART_BASE               0x180000
+#define CART_SIZE               0x80000

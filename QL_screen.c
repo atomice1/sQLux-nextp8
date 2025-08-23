@@ -16,6 +16,12 @@ screen_specs qlscreen =
    512,
 };
 
+#ifdef NEXTP8
+uint8_t frameBuffer[2][8192];
+uint8_t screenPalette[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+int vfront = 0, vfrontreq = 0;
+#endif
+
 struct SCREENDEF
 {
   uw32 scrbase;

@@ -14,7 +14,8 @@
 void    (**qlux_table)(void);
 
 #ifdef DEBUG
-int trace_rts=0;
+//int trace_rts=0;
+extern int trace_rts;
 #endif
 
 int extInt=0;
@@ -129,6 +130,8 @@ volatile w8     intReg=0;
 volatile w8     theInt=0;
 
 Cond doTrace;            /* trace after current instruction */
+
+bool asyncTrace;
 
 void ProcessInterrupts(void) 
 {   
@@ -289,7 +292,7 @@ void REGP1 SetPC(w32 addr)
 #endif
 }
 
-#if 1
+#if 0
 void ShowException(void){}
 #else
 void ShowException(void)
@@ -367,7 +370,7 @@ void ExceptionProcessing()
 	  if(extraFlag)
 	    {
 	      UpdateNowRegisters();
-	      /*ShowException(); */
+	      ShowException();
 	      nInst=nInst2=0;
 	    }
 	}
@@ -443,7 +446,21 @@ void ExecuteLoop(void)  /* fetch and dispatch loop */
 #ifdef TRACE
       if (pc>tracelo) DoTrace();
 #endif
-
+  if (asyncTrace || ((w32)((void*)pc-(void*)memBase) >= 0x4254c && (w32)((void*)pc-(void*)memBase) < 0x425da)) {
+      printf("%lx\n", (unsigned long)(w32)((void*)pc-(void*)memBase));
+      printf("D0=0x%lx\n", (unsigned long)reg[0]);
+      printf("D1=0x%lx\n", (unsigned long)reg[1]);
+      fflush(stdout);
+  }
+    //printf("ExecuteLoop: pc = %x\n", (w32)((void*)pc-(void*)memBase));
+    /*if ((w32)((void*)pc-(void*)memBase) >= 0x40000 ) {
+      printf("ExecuteLoop: pc = %x\n", (w32)((void*)pc-(void*)memBase));
+      if ((w32)((void*)pc-(void*)memBase) > 0x451d8 ) {
+        fflush(stdout);
+        fprintf(stderr, "Invalid PC address: %x\n", (w32)((void*)pc-(void*)memBase));
+        exit(1);
+      }
+    }*/
       qlux_table[code=RW(pc++)&0xffff]();
     }
 
@@ -494,4 +511,23 @@ void InitialSetup(void) /* 68K state when powered on */
   pendingInterrupt=0;
   stopped=false;
   badCodeAddress=false;
+}
+
+void DumpState(void)
+{
+	printf("PC=%lx\n", (unsigned long)((char *)pc - (char *)memBase));
+	for (int i=-8;i<=8;i+=2)
+	    printf("%lx: %lx\n", (unsigned long)((char *)pc - (char *)memBase + i), (unsigned long)ReadWord((aw32)((char *)pc - (char *)memBase) + i));
+	printf("*SP=%lx\n", (unsigned long)ReadLong(*m68k_sp));
+	for (int i=0;i<=16;i+=2)
+	    printf("%lx: %lx\n", (unsigned long)(*m68k_sp+i), (unsigned long)ReadLong(*m68k_sp+i));
+	printf("Backtrace:\n");
+	uint32_t fp = ReadLong(*(aReg+6));
+	while (fp) {
+		uint32_t ret = ReadLong(fp+4);
+		if (ret)
+			printf("  %lx\n", (unsigned long) ret);
+		fp = ReadLong(fp);
+	}
+  fflush(stdout);
 }

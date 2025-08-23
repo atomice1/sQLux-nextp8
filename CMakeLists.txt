@@ -4,14 +4,25 @@ option(SUPPORT_SHADERS "Set to true to enable shader support" OFF)
 option(GPL2_CODE "Set to enable GPL2 code inclusion" OFF)
 option(LTO "Use LTO in compile" OFF)
 
-project(sqlux C)
+project(sqlux C CXX)
 
 message(STATUS "Using toolchain file: ${CMAKE_TOOLCHAIN_FILE}.")
+
+if (NOT DEFINED NEXTP8_BSP)
+message(FATAL_ERROR "Set NEXTP8_BSP to the path to the nextp8 BSP")
+endif()
 
 set(CMAKE_C_FLAGS
   "${CMAKE_C_FLAGS} -DLINUX -DUSE_IOSZ -DDO_GRAB \
 	-DNEWSERIAL -DSH_MEM -DXSCREEN \
     -DEVM_SCR -D_GNU_SOURCE -DMOUSE -DQVFS -Wno-incompatible-pointer-types")
+
+set(CMAKE_C_FLAGS
+  "${CMAKE_C_FLAGS} -DNEXTP8 -I${NEXTP8_BSP}/include")
+#set(CMAKE_C_FLAGS
+#  "${CMAKE_C_FLAGS} -DDEBUG -DTRACE")
+set(CMAKE_C_FLAGS
+  "${CMAKE_C_FLAGS} -g")
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(CMAKE_C_FLAGS
@@ -41,6 +52,8 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Emscripten")
 else()
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Ofast")
 endif()
+
+set(CMAKE_CXX_FLAGS ${CMAKE_C_FLAGS})
 
 find_package(Git)
 add_custom_target(
@@ -129,6 +142,8 @@ add_executable(
   memaccess.c
   pty.c
   qmtrap.c
+  sdspi.cpp
+  sdspisim.cpp
   trace.c
   unixstuff.c
   util.c

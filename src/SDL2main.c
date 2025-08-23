@@ -1,6 +1,7 @@
 #include <ftw.h>
 #include <SDL.h>
 #include <stdio.h>
+#include <sys/signal.h>
 #include <unistd.h>
 
 #include "debug.h"
@@ -16,6 +17,9 @@
 #include <emscripten/emscripten.h>
 #include "wasm_support.h"
 #endif
+
+extern void DumpState(void);
+extern bool asyncTrace;
 
 static SDL_Thread *emuThread = NULL;
 
@@ -102,6 +106,21 @@ static void reattach_console(void)
 }
 #endif
 
+static void sighandler(int signo)
+{
+    printf("DumpState\n");
+    fflush(stdout);
+    DumpState();
+}
+
+static void sighandler2(int signo)
+{
+    printf("DumpState\n");
+    fflush(stdout);
+    DumpState();
+    asyncTrace = true;
+}
+
 int main(int argc, char *argv[])
 {
 #if __EMSCRIPTEN__
@@ -126,6 +145,7 @@ int main(int argc, char *argv[])
     verbose = emulatorOptionInt("verbose");
 
     // setup the boot_cmd if needed
+#ifndef NEXTP8
     const char *boot_cmd=emulatorOptionString("boot_cmd");
     if (strlen(boot_cmd)) {
         ux_boot = 2;
@@ -135,7 +155,21 @@ int main(int argc, char *argv[])
         ux_bname[len] = 0x0A;
         ux_bname[len + 1] = 0;
     }
+#endif
 
+    printf("set sighandler\n");
+    fflush(stdout);
+    struct sigaction act;
+    memset(&act, 0, sizeof(act));
+    act.sa_handler = sighandler;
+    int ret = sigaction(SIGUSR1, &act, NULL);
+    if (ret != 0)
+        perror("sigaction");
+    memset(&act, 0, sizeof(act));
+    act.sa_handler = sighandler2;
+    ret = sigaction(SIGUSR2, &act, NULL);
+    if (ret != 0)
+        perror("sigaction");
 
 #if __EMSCRIPTEN__
     emscripten_set_main_loop(emu_loop, -1, 1);

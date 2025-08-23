@@ -214,6 +214,8 @@ void UpdateNowRegisters(void);
 Cond IPC_Command(void);
 void WriteMdvControl(aw8) REGP1;
 
+void DumpState(void);
+
 #define LongFromByte(__d__) ((w32)((w8)(__d__)))
 #define LongFromWord(__d__) ((w32)((w16)(__d__)))
 #define WordFromByte(__d__) ((w16)((w8)(__d__)))
@@ -290,18 +292,19 @@ static inline void _wl_(uw32 *d, uw32 v)
 }
 
 #ifndef RW
-#define RW(_r_a) _rw_((void *)(_r_a))
+#define RW(_r_a) _rw_((uw32 *)(_r_a))
 #endif
 #ifndef RL
-#define RL(_r_al) _rl_((void *)(_r_al))
+#define RL(_r_al) _rl_((uw32 *)(_r_al))
 #endif
 #ifndef WW
-#define WW(_r_a, _r_v) _ww_((void *)(_r_a), (_r_v))
+#define WW(_r_a, _r_v) _ww_((uw32 *)(_r_a), (_r_v))
 #endif
 #ifndef WL
-#define WL(_r_al, _r_vl) _wl_((void *)(_r_al), (_r_vl))
+#define WL(_r_al, _r_vl) _wl_((uw32 *)(_r_al), (_r_vl))
 #endif
 
+extern void DbgInfo(void);
 #define dbginfo(format,args...) {printf(format, ## args);\
                                  DbgInfo();}
 

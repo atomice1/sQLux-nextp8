@@ -33,11 +33,15 @@ int emulatorLoadRom(const char *romDir, const char *romName, uint32_t addr, size
 	int ret, romFile;
 	sds romPath;
 
-	if (romDir[0] == '~') {
-		romPath = sdscatprintf(sdsnew(""), "%s/%s/%s",
-			homedir, romDir + 1, romName);
+	if (!strchr(romName, '/')) {
+		if (romDir[0] == '~') {
+			romPath = sdscatprintf(sdsnew(""), "%s/%s/%s",
+				homedir, romDir + 1, romName);
+		} else {
+			romPath = sdscatprintf(sdsnew(""), "%s/%s", romDir, romName);
+		}
 	} else {
-		romPath = sdscatprintf(sdsnew(""), "%s/%s", romDir, romName);
+		romPath = sdsnew(romName);
 	}
 
 	ret = stat(romPath, &romStat);
@@ -47,13 +51,11 @@ int emulatorLoadRom(const char *romDir, const char *romName, uint32_t addr, size
 		return ret;
 	}
 
-	if (romStat.st_size > size) {
-		fprintf(stderr, "FUNC: %s ERR: Rom Size Error VAL: %zd != %jd\n",
-			__func__, size, (intmax_t)romStat.st_size);
+	if (romStat.st_size > size && 0) {
+		fprintf(stderr, "FUNC: %s ERR: Rom Size Error VAL: %jd > %zd\n",
+			__func__, (intmax_t)romStat.st_size, size);
 		return -1;
 	}
-	else if (romStat.st_size < size)
-		puts ("SQLX WARNING: ROM is not 48k");
 
 	romFile = open(romPath, O_RDONLY);
 	if (romFile < 0) {
@@ -61,12 +63,15 @@ int emulatorLoadRom(const char *romDir, const char *romName, uint32_t addr, size
 			__func__, strerror(errno), romPath);
 		return -1;
 	}
-    	ret = read(romFile, (char *)memBase + addr, size);
+	ret = read(romFile, (char *)memBase + addr, romStat.st_size);
 	if (ret < 0) {
 		fprintf(stderr, "FUNC: %s ERR: %s VAL: %s\n",
 			__func__, strerror(errno), romPath);
 	}
-    	close(romFile);
+	if (ret != romStat.st_size) {
+		fprintf(stderr, "FUNC: %s ERR: %s VAL: %s\n",
+			__func__, "partial read", romPath);
+	}
 
 	sdsfree(romPath);
 
@@ -86,15 +91,21 @@ void emulatorInit()
 	tzset();
 
 	if (emulatorOptionInt("ramsize")) {
+#ifdef NEXTP8
+		RTOP = emulatorOptionInt("ramsize") * 1024;
+#else
 		RTOP = (128 + emulatorOptionInt("ramsize")) * 1024;
+#endif
 	} else {
 		RTOP = emulatorOptionInt("ramtop") * 1024;
 	}
 
+#ifndef NEXTP8
 	if (RTOP < (256 * 1024)) {
 		fprintf(stderr, "Sorry not enough ram defined for QDOS %dK\n", (RTOP / 1024) - 128);
 		exit(1);
 	}
+#endif
 
 	memBase = (int32_t *)malloc(RTOP);
 	if (memBase == NULL) {
@@ -109,12 +120,41 @@ void emulatorInit()
 	}
 
 	const char *romdir = emulatorOptionString("romdir");
-	const char *sysrom = emulatorOptionString("sysrom");
+#ifdef NEXTP8
+	const char *rom1 = emulatorOptionString("rom1");
+	const char *rom2 = emulatorOptionString("rom2");
+	const char *cart = emulatorOptionString("cart");
+#else
+    const char *sysrom = emulatorOptionString("sysrom");
 	const char *romport = emulatorOptionString("romport");
 	const char *romim = emulatorOptionString("romim");
 	const char *iorom1 = emulatorOptionString("iorom1");
 	const char *iorom2 = emulatorOptionString("iorom2");
+#endif
 
+#ifdef NEXTP8
+	if (strlen(rom1)) {
+		ret = emulatorLoadRom(romdir, rom1, 0, 256 * 1024);
+		if (ret < 0) {
+			fprintf(stderr, "Error Loading rom1 %s\n", rom1);
+			exit(ret);
+		}
+	}
+	if (strlen(rom2)) {
+		ret = emulatorLoadRom(romdir, rom2, 512 * 1024, 256 * 1024);
+		if (ret < 0) {
+			fprintf(stderr, "Error Loading rom2 %s\n", rom2);
+			exit(ret);
+		}
+	}
+	if (strlen(cart)) {
+		ret = emulatorLoadRom(romdir, cart, CART_BASE, CART_SIZE);
+		if (ret < 0) {
+			fprintf(stderr, "Error Loading cart %s\n", cart);
+			exit(ret);
+		}
+	}
+#else
 	ret = emulatorLoadRom(romdir, sysrom, QL_ROM_BASE, QL_ROM_SIZE);
 	if (ret < 0) {
 		fprintf(stderr, "Error Loading sysrom %s\n", sysrom);
@@ -150,6 +190,7 @@ void emulatorInit()
 			exit(ret);
 		}
 	}
+#endif
 
 	init_uqlx_tz();
 
@@ -194,6 +235,14 @@ void emulatorInit()
 		qlscreen.qm_hi = 128 * 1024 + 32 * 1024;
 		qlscreen.qm_len = 0x8000;
 	}
+#ifdef NEXTP8
+	qlscreen.linel = 128;
+	qlscreen.yres = 128;
+	qlscreen.xres = 128;
+	qlscreen.qm_lo = 0;
+	qlscreen.qm_len = 0x2000;
+	qlscreen.qm_hi = qlscreen.qm_lo + qlscreen.qm_len;
+#endif
 
 	if (V1 && (atof(emulatorOptionString("speed")) > 0.0))
 		printf("Emulation Speed: %s\n", emulatorOptionString("speed"));
@@ -234,8 +283,10 @@ void emulatorInit()
 	}
 	qlux_table[BASEXT_CMD_CODE] = BASEXTCmd;
 
+#ifndef NEXTP8
 	if (emulatorOptionInt("skip_boot"))
 		qlux_table[0x4e43] = btrap3;
+#endif
 
 	InitialSetup();
 

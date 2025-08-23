@@ -18,7 +18,10 @@ struct TRT
   char *comment;
 } tracetable[]={
 #if 1 // ROM
-                {0,16384*3,"ROM"},
+                {0,(uw16 *)(16384*3),"ROM"},
+#endif
+#if 1 // RAM
+                {(uw16*) 0x28000, (uw16 *)0xfffff, "RAM"},
 #endif
 #if 0
                 {0xf7938,0xf7a38,"Qsave"},
@@ -95,10 +98,10 @@ void CheckTrace()
     }
   if (curr)
     {
-      tracelo=(uw16*)((Ptr)(curr->low)+(long)memBase);
-      tracehi=(uw16*)((Ptr)(curr->high)+(long)memBase);
+      tracelo=(uw16*)((uintptr_t)(curr->low)+(uintptr_t)memBase);
+      tracehi=(uw16*)((uintptr_t)(curr->high)+(uintptr_t)memBase);
     }
-  else tracelo=(uw16*)((Ptr)RTOP+(long)memBase); 
+  else tracelo=(uw16*)((uintptr_t)RTOP+(uintptr_t)memBase); 
 }
 
 void DoTrace()
@@ -111,7 +114,7 @@ void DoTrace()
       return;
     }
   
-  printf("Trace : %s+%x\n",curr->comment,(Ptr)pc-(Ptr)(curr->low)-(long)memBase);
+  printf("Trace : %s+%lx\n",curr->comment,(Ptr)pc-(Ptr)(curr->low)-(long)memBase);
   DbgInfo();
 }
  
@@ -187,7 +190,7 @@ void BackTrace(int depth)
       }
       else BTShowException(-what);
       
-      printf("at PC=%x, new pc=%x\n",(Ptr)(p->where)-(Ptr)memBase,p->to);
+      printf("at PC=%lx, new pc=%lx\n",(Ptr)(p->where)-(Ptr)memBase,(long)p->to);
     }
 }
 
