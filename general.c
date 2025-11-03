@@ -21,6 +21,7 @@
 #ifdef NEXTP8
 #include "nextp8.h"
 #include "sdspi.h"
+#include "p8audio.h"
 #endif
 
 #include <signal.h>
@@ -456,6 +457,8 @@ rw8 ReadHWByte(aw32 addr)
 			return frameBuffer[1][addr - _FRAME_BUFFER2_BASE] & 0xff;
 		if (addr >= _PALETTE_BASE && addr < _PALETTE_BASE + _PALETTE_SIZE)
 			return screenPalette[addr - _PALETTE_BASE] & 0xff;
+		if (addr >= _P8AUDIO_BASE && addr < _P8AUDIO_BASE + 0x100)
+			return 0;
 #endif
 		debug2("Read from HW register ", addr);
 		debug2("at (PC-2) ", (Ptr)pc - (Ptr)memBase - 2);
@@ -491,6 +494,8 @@ rw16 ReadHWWord(aw32 addr)
 	}
 	case _UTIMER_1KHZ_LO:
 		return utbuf_1khz;
+	case _P8AUDIO_VERSION:
+		return P8AUDIO_VERSION;
 #else
 	case 0x018108:
 		return SQLUXBDISizeHigh();
@@ -520,7 +525,7 @@ void WriteHWWord(aw32 addr, aw16 d)
 		!(addr >= _FRAME_BUFFER1_BASE && addr < _FRAME_BUFFER1_BASE + _FRAME_BUFFER_SIZE) &&
 		!(addr >= _FRAME_BUFFER2_BASE && addr < _FRAME_BUFFER2_BASE + _FRAME_BUFFER_SIZE) &&
 		!(addr >= _PALETTE_BASE && addr < _PALETTE_BASE + _PALETTE_SIZE))
-		printf("WriteHWWord: %lx\n", (unsigned long) addr);
+		printf("WriteHWWord at 0x%lx val=0x%x\n", (unsigned long) addr, ((unsigned) d) & 0xffff);
 	switch (addr) {
 #ifdef NEXTP8
 	case _DA_CONTROL:
@@ -531,6 +536,33 @@ void WriteHWWord(aw32 addr, aw16 d)
 	case _DA_PERIOD:
 		da_period = d & 0xfff;
 		printf("da_period = %u\n", da_period);
+		break;
+	case _P8AUDIO_CTRL:
+		p8audio_control = d;
+		break;
+	case _P8AUDIO_SFX_BASE_HI:
+		p8audio_sfx_base_hi = d;
+		break;
+	case _P8AUDIO_SFX_BASE_LO:
+		p8audio_sfx_base_lo = d;
+		break;
+	case _P8AUDIO_MUSIC_BASE_HI:
+		p8audio_music_base_hi = d;
+		break;
+	case _P8AUDIO_MUSIC_BASE_LO:
+		p8audio_music_base_lo = d;
+		break;
+	case _P8AUDIO_SFX_LEN:
+		p8audio_sfx_length = d;
+		break;
+	case _P8AUDIO_MUSIC_FADE:
+		p8audio_music_fade_time = d;
+		break;
+	case _P8AUDIO_SFX_CMD:
+		p8audio_sfx_command(d);
+		break;
+	case _P8AUDIO_MUSIC_CMD:
+		p8audio_music_command(d);
 		break;
 #else
 	case 0x018104:

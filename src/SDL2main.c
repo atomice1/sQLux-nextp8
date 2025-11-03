@@ -8,6 +8,7 @@
 #include "emudisk.h"
 #include "emulator_init.h"
 #include "emulator_options.h"
+#include "p8_audio.h"
 #include "QL_sound.h"
 #include "SDL2screen.h"
 #include "unixstuff.h"
@@ -83,6 +84,7 @@ void emu_loop() {
         emulatorInit();
         QLSDLScreen();
         initSound(emulatorOptionInt("sound"));
+        audio_init();
         emuThread = SDL_CreateThread(QLRun, "sQLux Emulator", NULL);
         init_done = 1;
     }

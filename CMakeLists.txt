@@ -140,8 +140,12 @@ add_executable(
   instructions_ao.c
   instructions_pz.c
   memaccess.c
+  p8audio.c
+  p8_audio.c
+  p8_dsp.c
   pty.c
   qmtrap.c
+  queue.c
   sdspi.cpp
   sdspisim.cpp
   trace.c
@@ -164,6 +168,8 @@ add_executable(
   inih/ini.c)
 set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/version.c
   PROPERTIES GENERATED TRUE)
+set_source_files_properties(p8_audio.c
+    PROPERTIES COMPILE_FLAGS "-UNEXTP8 -DSDL")
 
 add_dependencies(sqlux SubmarineGitVersion)
 
