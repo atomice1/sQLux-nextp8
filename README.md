@@ -16,7 +16,7 @@ It is hacked from the sQLux Sinclar QL emulator.
 * Build femto8-nextp8.
 * Create a link to the bootloader in the roms directory:
 ```
-ln -s ../loader/loader.bin.bin roms/
+ln -s ../../nextp8-loader/build/loader.bin roms/
 ```
 * Make an SD card image with the femto8-nextp8 binary on it:
 ```
