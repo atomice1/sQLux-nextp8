@@ -446,7 +446,7 @@ void ExecuteLoop(void)  /* fetch and dispatch loop */
 #ifdef TRACE
       if (pc>tracelo) DoTrace();
 #endif
-  if (asyncTrace || ((w32)((void*)pc-(void*)memBase) >= 0x4254c && (w32)((void*)pc-(void*)memBase) < 0x425da)) {
+  if (asyncTrace) {
       printf("%lx\n", (unsigned long)(w32)((void*)pc-(void*)memBase));
       printf("D0=0x%lx\n", (unsigned long)reg[0]);
       printf("D1=0x%lx\n", (unsigned long)reg[1]);
