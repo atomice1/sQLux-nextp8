@@ -74,9 +74,9 @@ struct emuOpts emuOptions[] = {
 {"print", "", "command to use for print jobs", EMU_OPT_CHAR, 0, "lpr"},
 #endif
 #ifdef NEXTP8
-{"ramtop", "r", "The memory space top (not valid if ramsize set)", EMU_OPT_INT, 2048, NULL},
+{"ramtop", "r", "The memory space top (not valid if ramsize set)", EMU_OPT_INT, 4096, NULL},
 #else
-{"ramtop", "r", "The memory space top (128K + QL ram, not valid if ramsize set)", EMU_OPT_INT, 2048, NULL},
+{"ramtop", "r", "The memory space top (128K + QL ram, not valid if ramsize set)", EMU_OPT_INT, 4096, NULL},
 #endif
 {"ramsize", "", "The size of ram", EMU_OPT_INT, 0, NULL},
 {"resolution", "g", "resolution of screen in mode 4", EMU_OPT_CHAR, 0, "512x256"},
