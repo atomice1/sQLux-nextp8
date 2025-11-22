@@ -32,6 +32,9 @@
 #include "QFilesPriv.h"
 #include "xqlmouse.h"
 #include "Xscreen.h"
+#ifdef NEXTP8
+#include "nextp8.h"
+#endif
 
 static short ramItem = -1;
 extern int do_update;
@@ -431,3 +434,12 @@ void InitROM(void)
 	qlux_table[code = 0x0c93](); /* run the original routine */
 #endif
 }
+
+#ifdef NEXTP8
+void WriteConfigPage(void)
+{
+	struct _config_data *configData = (struct _config_data *)(((char *)memBase) + _CONFIG_BASE_ROM);
+	memset(configData, 0, sizeof(struct _config_data));
+	strcpy(&configData->core_path, "/MACHINES/NEXTP8");
+}
+#endif

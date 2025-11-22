@@ -242,6 +242,8 @@ void emulatorInit()
 	qlscreen.qm_lo = 0;
 	qlscreen.qm_len = 0x2000;
 	qlscreen.qm_hi = qlscreen.qm_lo + qlscreen.qm_len;
+
+	WriteConfigPage();
 #endif
 
 	if (V1 && (atof(emulatorOptionString("speed")) > 0.0))
