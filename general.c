@@ -22,6 +22,7 @@
 #include "nextp8.h"
 #include "sdspi.h"
 #include "p8audio.h"
+#include "uart.h"
 #endif
 
 #include <signal.h>
@@ -139,6 +140,33 @@ void (*PutToEA_l[8])(ashort, aw32) /*REGP2*/ = { PutToEA_l_m0, PutToEA_l_m1,
 	}
 #else
 #define TRR
+#endif
+
+#ifdef NEXTP8
+UART_t *uart = NULL;
+UART_t *uart2 = NULL;
+
+void UART_TickAndReceive(int cycles)
+{
+	if (uart == NULL) {
+		uart = UART_Create();
+		uart2 = UART_Create();
+	}
+	if (cycles > 1) cycles *= UART_GetSpeed(uart);
+	for (int i=0;i<cycles;++i) {
+		UART_Tick(uart);
+        UART_Tick(uart2);
+        UART_SetRx(uart2, UART_GetTx(uart));
+		if (UART_GetDataReady(uart2)) {
+			UART_SetRead(uart2, 1);
+			UART_Tick(uart2);
+			char c = UART_GetDataOut(uart2);
+			(void) write(STDOUT_FILENO, &c, 1);
+			UART_SetRead(uart2, 0);
+			UART_Tick(uart2);
+		}
+	}
+}
 #endif
 
 w8 ReadRTClock(w32 addr)
@@ -284,6 +312,16 @@ void WriteHWByte(aw32 addr, aw8 d)
 	case _SDSPI_WRITE_ENABLE:
 		SDSPI_SetWriteEnable(d);
 		break;
+	case _UART_CTRL:
+		UART_TickAndReceive(1);
+		UART_SetControl(uart, d);
+		UART_TickAndReceive(1);
+		break;
+	case _UART_DATA:
+		UART_TickAndReceive(1);
+		UART_SetDataIn(uart, d);
+		UART_TickAndReceive(12);
+		break;
 #else
 	case 0x018063: /* Display control */
 		SetDisplay(d, true);
@@ -380,6 +418,18 @@ rw8 ReadHWByte(aw32 addr)
 		return SDSPI_GetDataOut();
 	case _SDSPI_READY:
 		return SDSPI_GetReady();
+	case _UART_CTRL: {
+		UART_TickAndReceive(1);
+		uint8_t ret = UART_GetControl(uart);
+		UART_TickAndReceive(1);
+		return ret;
+	}
+	case _UART_DATA: {
+		UART_TickAndReceive(1);
+		uint8_t ret = UART_GetDataOut(uart);
+		UART_TickAndReceive(1);
+		return ret;
+	}
 #else
 	case 0x018000: /* Read from real-time clock */
 	case 0x018001:
@@ -563,6 +613,12 @@ void WriteHWWord(aw32 addr, aw16 d)
 		break;
 	case _P8AUDIO_MUSIC_CMD:
 		p8audio_music_command(d);
+		break;
+	case _UART_BAUD_DIV:
+		UART_TickAndReceive(1);
+		UART_SetSpeed(uart, d);
+		UART_SetSpeed(uart2, d);
+		UART_TickAndReceive(1);
 		break;
 #else
 	case 0x018104:

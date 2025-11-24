@@ -149,6 +149,7 @@ add_executable(
   sdspi.cpp
   sdspisim.cpp
   trace.c
+  uart.cpp
   unixstuff.c
   util.c
   uxfile.c

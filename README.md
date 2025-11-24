@@ -7,7 +7,7 @@ It is hacked from the sQLux Sinclar QL emulator.
 
 # Usage
 
-* Copy `sdspi.cpp`, `sdspi.h`, `sdspisim.cpp` and `sdspisim.h` from `nextp8-core/c_models`.
+* Copy the files from `nextp8-core/c_models`.
 * Copy `p8_audio.c`, `p8_audio.h`, `p8_dsp.c`, `p8_dsp.h`, `queue.h` from `femto8`.
 * Build sQLux according to the instructions in the [upstream README](README_upstream.md).
 * Build the m68k-elf-gcc toolchain.
