@@ -75,7 +75,7 @@ static void silenceBuffer(int start, Sint8* buffer, int len);
 #define TICK_8049 22917		// Number of IPC ticks per second
 
 #ifdef NEXTP8
-#define FREQUENCY 44100		// Requested sampling frequency
+#define FREQUENCY 5513		// Requested sampling frequency
 #define SAMPLES 512		// Number of samples in a callback
 #else
 #define FREQUENCY 24000		// Requested sampling frequency
