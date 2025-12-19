@@ -81,7 +81,7 @@ struct emuOpts emuOptions[] = {
 {"ramsize", "", "The size of ram", EMU_OPT_INT, 0, NULL},
 {"resolution", "g", "resolution of screen in mode 4", EMU_OPT_CHAR, 0, "512x256"},
 #ifdef NEXTP8
-{"rom1", "", "rom 1", EMU_OPT_CHAR, 0, "rom.bin"},
+{"rom1", "", "rom 1", EMU_OPT_CHAR, 0, "loader.bin"},
 {"rom2", "", "rom 2", EMU_OPT_CHAR, 0, ""},
 #endif
 {"romdir", "", "path to the roms", EMU_OPT_CHAR, 0, "roms"},
