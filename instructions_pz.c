@@ -5,6 +5,10 @@
 #include "QL68000.h"
 #include "mmodes.h"
 
+#ifdef PROFILER
+#include "profiler/profiler_events.h"
+#endif
+
 #ifdef DEBUG
 extern int trace_rts;
 #endif
@@ -158,6 +162,10 @@ void rts(void)
 	}
 #endif
 	(*m68k_sp) += 4;
+
+#ifdef PROFILER
+	Profiler_RecordReturn((Ptr)pc - (Ptr)memBase);
+#endif
 
 #ifdef DEBUG
 	if (trace_rts-- > 0)

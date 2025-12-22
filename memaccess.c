@@ -11,6 +11,10 @@
 #include "SDL2screen.h"
 #include <unistd.h>
 
+#ifdef PROFILER
+#include "profiler/profiler_events.h"
+#endif
+
 static int is_hw(uint32_t addr)
 {
 	if (((addr >= QL_INTERNAL_IO_BASE) &&
@@ -29,6 +33,10 @@ rw8 ReadByte(aw32 addr)
 {
 	addr &= ADDR_MASK;
 
+#ifdef PROFILER
+	Profiler_RecordDataRead(addr);
+#endif
+
 	if (is_hw(addr))
 		return ReadHWByte(addr);
 
@@ -41,6 +49,10 @@ rw8 ReadByte(aw32 addr)
 rw16 ReadWord(aw32 addr)
 {
 	addr &= ADDR_MASK;
+
+#ifdef PROFILER
+	Profiler_RecordDataRead(addr);
+#endif
 
 	if (is_hw(addr))
 		return ((w16)ReadHWWord(addr));
@@ -55,6 +67,10 @@ rw32 ReadLong(aw32 addr)
 {
 	addr &= ADDR_MASK;
 
+#ifdef PROFILER
+	Profiler_RecordDataRead(addr);
+#endif
+
 	if (is_hw(addr))
 		return ((w32)ReadHWLong(addr));
 
@@ -67,6 +83,11 @@ rw32 ReadLong(aw32 addr)
 void WriteByte(aw32 addr,aw8 d)
 {
 	addr &= ADDR_MASK;
+	
+#ifdef PROFILER
+	Profiler_RecordDataWrite(addr);
+#endif
+	
 	if (addr == 0xfffffe) {
 		write(1, &d, 1);
 		return;
@@ -91,6 +112,10 @@ void WriteWord(aw32 addr,aw16 d)
 {
 	addr &= ADDR_MASK;
 
+#ifdef PROFILER
+	Profiler_RecordDataWrite(addr);
+#endif
+
 	if (is_hw(addr)) {
 		WriteHWWord(addr, d);
 		return;
@@ -106,6 +131,10 @@ void WriteWord(aw32 addr,aw16 d)
 void WriteLong(aw32 addr,aw32 d)
 {
 	addr &= ADDR_MASK;
+
+#ifdef PROFILER
+	Profiler_RecordDataWrite(addr);
+#endif
 
 	if (is_hw(addr)) {
 		WriteHWWord(addr, d >> 16);

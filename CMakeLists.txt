@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 option(SUPPORT_SHADERS "Set to true to enable shader support" OFF)
 option(GPL2_CODE "Set to enable GPL2 code inclusion" OFF)
 option(LTO "Use LTO in compile" OFF)
+option(PROFILER "Set to enable built-in profiler support" OFF)
 
 project(sqlux C CXX)
 
@@ -19,6 +20,14 @@ set(CMAKE_C_FLAGS
 
 set(CMAKE_C_FLAGS
   "${CMAKE_C_FLAGS} -DNEXTP8 -I${NEXTP8_BSP}/include")
+
+# Add profiler support if enabled
+if(PROFILER)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DPROFILER")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DPROFILER")
+  message(STATUS "Profiler support enabled")
+endif()
+
 #set(CMAKE_C_FLAGS
 #  "${CMAKE_C_FLAGS} -DDEBUG -DTRACE")
 set(CMAKE_C_FLAGS
@@ -112,8 +121,26 @@ include_directories(
   ${SDL2_INCLUDE_DIRS}
   ${SDL2_GPU_INCLUDE_DIRS})
 
+# Profiler source files
+set(PROFILER_SOURCES "")
+if(PROFILER)
+  set(PROFILER_SOURCES
+    profiler/profiler_data.cpp
+    profiler/profiler_grouped.cpp
+    profiler/profiler_invariants.cpp
+    profiler/profiler_callgrind.cpp
+    profiler/profiler_consumer.cpp
+    profiler/profiler_thread.cpp
+    profiler/profiler_client.cpp
+    profiler/profiler_api.cpp)
+  # Set the executable name to sqlux-profiler when profiler is enabled
+  set(SQLUX_EXECUTABLE_NAME sqlux-profiler)
+else()
+  set(SQLUX_EXECUTABLE_NAME sqlux)
+endif()
+
 add_executable(
-  sqlux
+  ${SQLUX_EXECUTABLE_NAME}
   Init.c
   QDisk.c
   QL_basext.c
@@ -166,28 +193,29 @@ add_executable(
   src/emulator_options.c
   sds/sds.c
   args/src/args.c
-  inih/ini.c)
+  inih/ini.c
+  ${PROFILER_SOURCES})
 set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/version.c
   PROPERTIES GENERATED TRUE)
 set_source_files_properties(p8_audio.c
     PROPERTIES COMPILE_FLAGS "-UNEXTP8 -DSDL")
 
-add_dependencies(sqlux SubmarineGitVersion)
+add_dependencies(${SQLUX_EXECUTABLE_NAME} SubmarineGitVersion)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-  target_sources(sqlux PRIVATE sQLuxLogo.rc)
+  target_sources(${SQLUX_EXECUTABLE_NAME} PRIVATE sQLuxLogo.rc)
 endif()
 if(${CMAKE_SYSTEM_NAME} MATCHES "Emscripten")
-  target_sources(sqlux PRIVATE src/wasm_support.c)
+  target_sources(${SQLUX_EXECUTABLE_NAME} PRIVATE src/wasm_support.c)
 endif()
 
 if(GPL2_CODE)
-  target_sources(sqlux PRIVATE GPL2/w5100.c GPL2/w5100_socket.c)
+  target_sources(${SQLUX_EXECUTABLE_NAME} PRIVATE GPL2/w5100.c GPL2/w5100_socket.c)
 endif()
 
 if(SUPPORT_SHADERS)
   message("Enabling shader support")
-  target_compile_definitions(sqlux PUBLIC ENABLE_SHADERS)
+  target_compile_definitions(${SQLUX_EXECUTABLE_NAME} PUBLIC ENABLE_SHADERS)
   set(INSTALL_LIBRARY "FALSE")
   set(BUILD_DEMOS "FALSE")
   set(BUILD_SHARED "FALSE")
@@ -196,13 +224,13 @@ if(SUPPORT_SHADERS)
   add_subdirectory(sdl-gpu)
   target_compile_options(SDL_gpu PRIVATE "-w")
   target_compile_options(SDL_gpu PRIVATE "-Wno-incompatible-pointer-types")
-  add_dependencies(sqlux SDL_gpu)
+  add_dependencies(${SQLUX_EXECUTABLE_NAME} SDL_gpu)
 endif()
 
 if(SDL2_LIBRARIES)
   if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     target_link_libraries(
-      sqlux
+      ${SQLUX_EXECUTABLE_NAME}
       -Wl,-Bstatic
       -L/usr/local/${TOOLCHAIN_PREFIX}/lib
       ${SDL2_GPU_LIB_DIRS}
@@ -219,26 +247,26 @@ if(SDL2_LIBRARIES)
       -static-libgcc
       -static-libstdc++)
   else()
-    target_link_libraries(sqlux ${SDL2_GPU_LIB_DIRS} ${SDL2_LIBRARIES}
+    target_link_libraries(${SQLUX_EXECUTABLE_NAME} ${SDL2_GPU_LIB_DIRS} ${SDL2_LIBRARIES}
       ${SDL2_GPU_LIBRARIES})
   endif()
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Emscripten")
-  target_link_libraries(sqlux ${SDL2_LIBRARIES})
+  target_link_libraries(${SQLUX_EXECUTABLE_NAME} ${SDL2_LIBRARIES})
 else()
-  target_link_libraries(sqlux SDL2::SDL2 ${SDL2_GPU_LIBRARIES})
+  target_link_libraries(${SQLUX_EXECUTABLE_NAME} SDL2::SDL2 ${SDL2_GPU_LIBRARIES})
 endif()
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-  target_link_libraries(sqlux -Wl,-Bstatic -lpthread -lssp -Wl,-Bdynamic)
+  target_link_libraries(${SQLUX_EXECUTABLE_NAME} -Wl,-Bstatic -lpthread -lssp -Wl,-Bdynamic)
 endif()
 
-set_target_properties(sqlux PROPERTIES LINK_FLAGS_RELEASE -s)
+set_target_properties(${SQLUX_EXECUTABLE_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)
 
 if(LTO)
-  set_property(TARGET sqlux PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+  set_property(TARGET ${SQLUX_EXECUTABLE_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 endif()
 
 # Ensure that a bare cmake will always exclude shaders
 unset(SUPPORT_SHADERS CACHE)
 
-install(TARGETS sqlux DESTINATION ${CMAKE_INSTALL_PREFIX}/bin/)
+install(TARGETS ${SQLUX_EXECUTABLE_NAME} DESTINATION ${CMAKE_INSTALL_PREFIX}/bin/)

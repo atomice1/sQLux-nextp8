@@ -11,6 +11,10 @@
 #include "mmodes.h"
 #include "unixstuff.h"
 
+#ifdef PROFILER
+#include "profiler/profiler_events.h"
+#endif
+
 void    (**qlux_table)(void);
 
 #ifdef DEBUG
@@ -461,6 +465,10 @@ void ExecuteLoop(void)  /* fetch and dispatch loop */
         exit(1);
       }
     }*/
+#ifdef PROFILER
+      // Record instruction execution
+      Profiler_RecordInstructionExecute((w32)((void*)pc-(void*)memBase));
+#endif
       qlux_table[code=RW(pc++)&0xffff]();
     }
 

@@ -14,6 +14,10 @@
 #include "unixstuff.h"
 #include "Xscreen.h"
 
+#ifdef PROFILER
+#include "profiler/profiler_api.h"
+#endif
+
 #if __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 #include "wasm_support.h"
@@ -69,6 +73,10 @@ void emu_shutdown()
     QLSDLExit();
 
     CleanRAMDev();
+
+#ifdef PROFILER
+    Profiler_Shutdown();
+#endif
 }
 
 void emu_loop() {
@@ -81,6 +89,9 @@ void emu_loop() {
     }
 #endif
     if(boot_file_ready && !init_done) {
+#ifdef PROFILER
+        Profiler_Initialize();
+#endif
         emulatorInit();
         QLSDLScreen();
         initSound(emulatorOptionInt("sound"));

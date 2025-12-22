@@ -5,6 +5,10 @@
 #include "QL68000.h"
 #include "mmodes.h"
 
+#ifdef PROFILER
+#include "profiler/profiler_events.h"
+#endif
+
 void abcd(void)
 {
 	w8 s, d, r;
@@ -634,25 +638,34 @@ void asr_m(void)
 
 void bcc_l(void)
 {
-	if (ConditionTrue[(code >> 8) & 15]())
+	if (ConditionTrue[(code >> 8) & 15]()) {
 		SetPC((Ptr)pc - (Ptr)memBase + (w16)RW(pc));
-	else
+#ifdef PROFILER
+		Profiler_RecordJump((Ptr)pc - (Ptr)memBase);
+#endif
+	} else
 		pc++;
 }
 
 void beq_l(void)
 {
-	if (zero)
+	if (zero) {
 		SetPC((Ptr)pc - (Ptr)memBase + (w16)RW(pc));
-	else
+#ifdef PROFILER
+		Profiler_RecordJump((Ptr)pc - (Ptr)memBase);
+#endif
+	} else
 		pc++;
 }
 
 void bne_l(void)
 {
-	if (!zero)
+	if (!zero) {
 		SetPC((Ptr)pc - (Ptr)memBase + (w16)RW(pc));
-	else
+#ifdef PROFILER
+		Profiler_RecordJump((Ptr)pc - (Ptr)memBase);
+#endif
+	} else
 		pc++;
 }
 
@@ -666,41 +679,53 @@ void bcc_bad(void)
 
 void bcc_s(void)
 {
-	if (ConditionTrue[(code >> 8) & 15]())
+	if (ConditionTrue[(code >> 8) & 15]()) {
 #ifdef DEBUG
 		SetPC((Ptr)pc - (Ptr)memBase + (w8)code);
 #else
 		pc = (uw16 *)((Ptr)pc + (w8)code);
 #ifdef TRACE
-	CheckTrace();
+		CheckTrace();
 #endif
 #endif
+#ifdef PROFILER
+		Profiler_RecordJump((Ptr)pc - (Ptr)memBase);
+#endif
+	}
 }
 
 void beq_s(void)
 {
-	if (zero)
+	if (zero) {
 #ifdef DEBUG
 		SetPC((Ptr)pc - (Ptr)memBase + (w8)code);
 #else
 		pc = (uw16 *)((Ptr)pc + (w8)code);
 #ifdef TRACE
-	CheckTrace();
+		CheckTrace();
 #endif
 #endif
+#ifdef PROFILER
+		Profiler_RecordJump((Ptr)pc - (Ptr)memBase);
+#endif
+	}
 }
 
 void bne_s(void)
 {
-	if (!zero)
+	if (!zero) {
 #ifdef DEBUG
 		SetPC((Ptr)pc - (Ptr)memBase + (w8)code);
 #else
 		pc = (uw16 *)((Ptr)pc + (w8)code);
 #ifdef TRACE
-	CheckTrace();
+		CheckTrace();
 #endif
 #endif
+#ifdef PROFILER
+		Profiler_RecordJump((Ptr)pc - (Ptr)memBase);
+#endif
+	}
 }
 
 void bcs_s(void)
@@ -810,6 +835,9 @@ void ble_s(void)
 void bra_l(void)
 {
 	SetPC((Ptr)pc - (Ptr)memBase + (w16)RW(pc));
+#ifdef PROFILER
+	Profiler_RecordJump((Ptr)pc - (Ptr)memBase);
+#endif
 }
 
 void bra_s(void)
@@ -821,6 +849,9 @@ void bra_s(void)
 #ifdef TRACE
 	CheckTrace();
 #endif
+#endif
+#ifdef PROFILER
+	Profiler_RecordJump((Ptr)pc - (Ptr)memBase);
 #endif
 }
 
@@ -919,6 +950,13 @@ void bsr(void)
 	if ((displ = (w16)(((w8)(code & 255)))) == 0) {
 		displ = (w16)RW(pc);
 		oldPC += 2;
+#ifdef PROFILER
+		Profiler_RecordCall((Ptr)pc - (Ptr)memBase + displ, 2);
+#endif
+	} else {
+#ifdef PROFILER
+		Profiler_RecordCall((Ptr)pc - (Ptr)memBase + displ, 0);
+#endif
 	}
 	WriteLong((*m68k_sp) -= 4, oldPC);
 #ifdef BACKTRACE
@@ -1581,17 +1619,25 @@ void illegal(void)
 
 void jmp(void)
 {
-	SetPC(ARCALL(GetEA, (code >> 3) & 7, (code & 7)));
+	w32 ea = ARCALL(GetEA, (code >> 3) & 7, (code & 7));
+	SetPC(ea);
 	/*SetPC(GET_EA((code>>3)&7,code&7));*/
+#ifdef PROFILER
+	Profiler_RecordJump(ea);
+#endif
 }
 
 void jsr(void)
 {
 	w32 ea;
 
+	w32 oldPC = (w32)((Ptr)pc - (Ptr)memBase);
 	ea = ARCALL(GetEA, (code >> 3) & 7, (code & 7));
 	/* ea=GET_EA((code>>3)&7,(code&7));*/
-	WriteLong((*m68k_sp) -= 4, (w32)((Ptr)pc - (Ptr)memBase));
+    WriteLong((*m68k_sp) -= 4, (w32)((Ptr)pc - (Ptr)memBase));
+#ifdef PROFILER
+	Profiler_RecordCall(ea, ((Ptr)pc - (Ptr)memBase) - oldPC);
+#endif
 #ifdef BACKTRACE
 	SetPCB(ea, JSR);
 #else
@@ -1604,6 +1650,9 @@ void jsr_displ(void)
 	register w32 ea;
 	ea = (uintptr_t)pc - (uintptr_t)memBase;
 	WriteLong((*m68k_sp) -= 4, ea + 2);
+#ifdef PROFILER
+	Profiler_RecordCall(ea + (w16)RW(pc), 2);
+#endif
 	SetPC(ea + (w16)RW(pc));
 }
 
