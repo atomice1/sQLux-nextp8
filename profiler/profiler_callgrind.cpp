@@ -2,6 +2,7 @@
 
 #include "profiler_callgrind.h"
 #include "profiler_grouped.h"
+#include "profiler_cost_model.h"
 #include <cassert>
 #include <iomanip>
 #include <iostream>
@@ -56,9 +57,9 @@ void CallgrindSerializer::WriteHeader(std::ofstream& out, const GroupedProfilerD
         total_data_writes += func.total_self_data_writes;
     }
 
-    // Cycles = Instructions + InstructionFetch * 3 + DataReads * 3 + DataWrites * 3
-    uint64_t total_cycles = total_instructions + (total_instr_fetches * 3) +
-                           (total_data_reads * 3) + (total_data_writes * 3);
+    // Use cost model for total cycle calculation
+    uint64_t total_cycles = Profiler_CalculateCycles(
+        total_instructions, total_instr_fetches, total_data_reads, total_data_writes);
 
     // Summary
     out << "summary: " << total_cycles << " " << total_instructions << " "
@@ -114,8 +115,9 @@ void CallgrindSerializer::WriteBody(std::ofstream& out, const GroupedProfilerDat
             }
 
             // Write self cost values: Cycles Instructions DataReads DataWrites
-            // Cycles = Instructions + InstructionFetch * 3 + DataReads * 3 + DataWrites * 3
-            uint64_t cycles = cost.self_cost + (cost.instr_fetches * 3) + (cost.data_reads * 3) + (cost.data_writes * 3);
+            // Use cost model for cycle calculation
+            uint64_t cycles = Profiler_CalculateCycles(
+                cost.self_cost, cost.instr_fetches, cost.data_reads, cost.data_writes);
             out << " " << cycles
                 << " " << cost.self_cost
                 << " " << cost.data_reads
@@ -138,10 +140,12 @@ void CallgrindSerializer::WriteBody(std::ofstream& out, const GroupedProfilerDat
 
                     // Cost line for the call (source position and inclusive costs)
                     // The position must be the caller address
-                    uint64_t incl_cycles = call->inclusive_instructions +
-                                          (call->inclusive_instr_fetches * 3) +
-                                          (call->inclusive_data_reads * 3) +
-                                          (call->inclusive_data_writes * 3);
+                    // Use cost model for inclusive cycle calculation
+                    uint64_t incl_cycles = Profiler_CalculateCycles(
+                        call->inclusive_instructions,
+                        call->inclusive_instr_fetches,
+                        call->inclusive_data_reads,
+                        call->inclusive_data_writes);
                     out << "0x" << std::hex << call->caller_address << std::dec
                         << " " << incl_cycles
                         << " " << call->inclusive_instructions

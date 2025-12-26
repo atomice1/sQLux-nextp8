@@ -242,7 +242,7 @@ void addi_b(void)
 {
 	w8 r, s;
 	w8 d;
-	s = (w8)RW(pc++);
+	s = (w8)RW_PC(pc++);
 	d = ModifyAtEA_b((code >> 3) & 7, code & 7);
 	r = d + s;
 	negative = r < 0;
@@ -259,7 +259,7 @@ void addi_w(void)
 	w16 r, s;
 	w16 d;
 
-	s = (w16)RW(pc++);
+	s = (w16)RW_PC(pc++);
 	d = ModifyAtEA_w((code >> 3) & 7, code & 7);
 	r = d + s;
 	negative = r < 0;
@@ -278,7 +278,7 @@ void addi_l(void)
 	w32 d;
 
 	/*s=*((w32*)pc);*/
-	s = RL((Ptr)pc);
+	s = RL_PC((Ptr)pc);
 	pc += 2;
 	d = ModifyAtEA_l((code >> 3) & 7, code & 7);
 	r = d + s;
@@ -551,7 +551,7 @@ void and_l_ea(void)
 void andi_b(void)
 {
 	register w8 d;
-	d = (w8)RW(pc++);
+	d = (w8)RW_PC(pc++);
 	d = d & ModifyAtEA_b((code >> 3) & 7, code & 7);
 	negative = d < 0;
 	zero = d == 0;
@@ -563,7 +563,7 @@ void andi_w(void)
 {
 	register w16 d;
 
-	d = (w16)RW(pc++);
+	d = (w16)RW_PC(pc++);
 	d = d & ModifyAtEA_w((code >> 3) & 7, code & 7);
 	negative = d < 0;
 	zero = d == 0;
@@ -575,7 +575,7 @@ void andi_l(void)
 {
 	register w32 d;
 
-	d = RL((Ptr)pc); /* d=*((w32*)pc); */
+	d = RL_PC((Ptr)pc); /* d=*((w32*)pc); */
 	pc += 2;
 	d = d & ModifyAtEA_l((code >> 3) & 7, code & 7);
 	negative = d < 0;
@@ -587,7 +587,7 @@ void andi_l(void)
 void andi_to_ccr(void)
 {
 	register uw16 d;
-	d = RW(pc++);
+	d = RW_PC(pc++);
 	carry = carry && ((d & 1) != 0);
 	overflow = overflow && ((d & 2) != 0);
 	zero = zero && ((d & 4) != 0);
@@ -598,7 +598,7 @@ void andi_to_ccr(void)
 void andi_to_sr(void)
 {
 	register w16 d;
-	d = (w16)RW(pc++);
+	d = (w16)RW_PC(pc++);
 	if (supervisor) {
 		d &= GetSR();
 		PutSR(d);
@@ -882,7 +882,7 @@ void bchg_s(void)
 	short EAmode;
 	short bit;
 	EAmode = (code >> 3) & 7;
-	bit = RW(pc++);
+	bit = RW_PC(pc++);
 	if (EAmode != 0) {
 		mask <<= bit & 7;
 		d = ModifyAtEA_b(EAmode, code & 7);
@@ -925,7 +925,7 @@ void bclr_s(void)
 	short EAmode;
 	short bit;
 	EAmode = (code >> 3) & 7;
-	bit = RW(pc++);
+	bit = RW_PC(pc++);
 	if (EAmode != 0) {
 		mask <<= bit & 7;
 		d = ModifyAtEA_b(EAmode, code & 7);
@@ -996,7 +996,7 @@ void bset_s(void)
 	short EAmode;
 	short bit;
 	EAmode = (code >> 3) & 7;
-	bit = RW(pc++);
+	bit = RW_PC(pc++);
 	if (EAmode != 0) {
 		mask <<= bit & 7;
 		d = ModifyAtEA_b(EAmode, code & 7);
@@ -1034,7 +1034,7 @@ void btst_s(void)
 	short EAmode;
 	short bit;
 	EAmode = (code >> 3) & 7;
-	bit = RW(pc++);
+	bit = RW_PC(pc++);
 	if (EAmode) {
 		mask <<= bit & 7;
 		zero = (GetFromEA_b[EAmode]() & mask) == 0;
@@ -1109,7 +1109,7 @@ void cmp_b(void)
 void cmp_b_dan(void)
 {
 	w8 r, s, d;
-	s = ReadByte(aReg[code & 7] + (w16)RW(pc++));
+	s = ReadByte(aReg[code & 7] + (w16)RW_PC(pc++));
 	d = *((w8 *)((Ptr)reg + ((code >> 7) & 28) + RBO));
 	r = d - s;
 	negative = r < 0;
@@ -1247,7 +1247,7 @@ void cmpa_l_an(void)
 void cmpi_b(void)
 {
 	w8 r, s, d;
-	s = (w8)RW(pc++);
+	s = (w8)RW_PC(pc++);
 	d = GetFromEA_b[(code >> 3) & 7]();
 	r = d - s;
 	negative = r < 0;
@@ -1261,7 +1261,7 @@ void cmpi_b(void)
 void cmpi_w(void)
 {
 	w16 r, s, d;
-	s = (w16)RW(pc++);
+	s = (w16)RW_PC(pc++);
 	d = GetFromEA_w[(code >> 3) & 7]();
 	r = d - s;
 	negative = r < 0;
@@ -1277,7 +1277,7 @@ void cmpi_l(void)
 {
 	w32 r, s, d;
 	/* s=*((w32*)pc); */
-	s = RL((Ptr)pc);
+	s = RL_PC((Ptr)pc);
 
 	pc += 2;
 	d = GetFromEA_l[(code >> 3) & 7]();
@@ -1490,7 +1490,7 @@ void eor_l(void)
 void eori_b(void)
 {
 	register w8 d;
-	d = (w8)RW(pc++);
+	d = (w8)RW_PC(pc++);
 	d = d ^ ModifyAtEA_b((code >> 3) & 7, code & 7);
 	negative = d < 0;
 	zero = d == 0;
@@ -1502,7 +1502,7 @@ void eori_w(void)
 {
 	register w16 d;
 
-	d = (w16)RW(pc++);
+	d = (w16)RW_PC(pc++);
 	d = d ^ ModifyAtEA_w((code >> 3) & 7, code & 7);
 	negative = d < 0;
 	zero = d == 0;
@@ -1514,7 +1514,7 @@ void eori_l(void)
 {
 	register w32 d;
 
-	d = RL((w32 *)pc);
+	d = RL_PC((w32 *)pc);
 	pc += 2;
 	d = d ^ ModifyAtEA_l((code >> 3) & 7, code & 7);
 	negative = d < 0;
@@ -1526,7 +1526,7 @@ void eori_l(void)
 void eori_to_ccr(void)
 {
 	register uw16 d;
-	d = RW(pc++);
+	d = RW_PC(pc++);
 	if ((d & 1) != 0)
 		carry = !carry;
 	if ((d & 2) != 0)
@@ -1542,7 +1542,7 @@ void eori_to_ccr(void)
 void eori_to_sr(void)
 {
 	register w16 d;
-	d = (w16)RW(pc++);
+	d = (w16)RW_PC(pc++);
 	if (supervisor) {
 		PutSR(GetSR() ^ d);
 	} else {
@@ -1668,7 +1668,7 @@ void link_ins(void)
 	r = &(aReg[code & 7]);
 	WriteLong((*m68k_sp) -= 4, *r);
 	*r = (*m68k_sp);
-	(*m68k_sp) += (w16)RW(pc++);
+	(*m68k_sp) += (w16)RW_PC(pc++);
 }
 
 void lsl_m(void)
@@ -1899,7 +1899,7 @@ void movem_save_w(void)
 	register short i;
 	w8 eaMode;
 
-	mask = RW(pc++);
+	mask = RW_PC(pc++);
 	eaMode = ((w8)code >> 3) & 7;
 	if (eaMode == 4) /* predecrement mode */
 	{
@@ -1935,7 +1935,7 @@ void movem_save_l(void)
 	register short i;
 	w8 eaMode;
 
-	mask = RW(pc++);
+	mask = RW_PC(pc++);
 	eaMode = ((w8)code >> 3) & 7;
 	if (eaMode == 4) /* predecrement mode */
 	{
@@ -1971,7 +1971,7 @@ void movem_load_w(void)
 	register short i;
 	w8 eaMode, eaReg;
 
-	mask = RW(pc++);
+	mask = RW_PC(pc++);
 	eaMode = ((w8)code >> 3) & 7;
 	eaReg = code & 7;
 	ea = (eaMode == 3) ? aReg[eaReg] : ARCALL(GetEA, eaMode, (eaReg));
@@ -1996,7 +1996,7 @@ void movem_load_l(void)
 	register short i;
 	w8 eaMode, eaReg;
 
-	mask = RW(pc++);
+	mask = RW_PC(pc++);
 	eaMode = ((w8)code >> 3) & 7;
 	eaReg = code & 7;
 	ea = (eaMode == 3) ? aReg[eaReg] : ARCALL(GetEA, eaMode, (eaReg));
@@ -2025,7 +2025,7 @@ void movep_w_mr(void) /* word from memory */
   /*BackTrace(10);*/
 #endif
 
-	ea = aReg[code & 7] + (w32)((w16)RW(pc++));
+	ea = aReg[code & 7] + (w32)((w16)RW_PC(pc++));
 #ifdef QM_BIG_ENDIAN
 	dn = (w8 *)reg + ((code >> 7) & 28) + RWO;
 	*dn++ = ReadByte(ea);
@@ -2048,7 +2048,7 @@ void movep_l_mr(void) /* long from memory */
 
 	/*  printf("movep\n"); */
 
-	ea = aReg[code & 7] + (w32)((w16)RW(pc++));
+	ea = aReg[code & 7] + (w32)((w16)RW_PC(pc++));
 #ifdef QM_BIG_ENDIAN
 	dn = (w8 *)reg + ((code >> 7) & 28);
 	*dn++ = ReadByte(ea);
@@ -2079,7 +2079,7 @@ void movep_w_rm(void) /* word to memory */
    DbgInfo(); */
 	/*BackTrace(10);*/
 
-	ea = aReg[code & 7] + (w32)((w16)RW(pc++));
+	ea = aReg[code & 7] + (w32)((w16)RW_PC(pc++));
 #ifdef QM_BIG_ENDIAN
 	dn = (w8 *)reg + ((code >> 7) & 28) + RWO;
 	WriteByte(ea, *dn++);
@@ -2102,7 +2102,7 @@ void movep_l_rm(void) /* long to memory */
 
 	/* printf("movep\n"); */
 
-	ea = aReg[code & 7] + (w32)((w16)RW(pc++));
+	ea = aReg[code & 7] + (w32)((w16)RW_PC(pc++));
 #ifdef QM_BIG_ENDIAN
 	dn = (w8 *)reg + ((code >> 7) & 28);
 	WriteByte(ea, *dn++);
@@ -2369,7 +2369,7 @@ void or_l_ea(void)
 void ori_b(void)
 {
 	register w8 d;
-	d = (w8)RW(pc++);
+	d = (w8)RW_PC(pc++);
 	d = d | ModifyAtEA_b((code >> 3) & 7, code & 7);
 	negative = d < 0;
 	zero = d == 0;
@@ -2381,7 +2381,7 @@ void ori_w(void)
 {
 	register w16 d;
 
-	d = (w16)RW(pc++);
+	d = (w16)RW_PC(pc++);
 	d = d | ModifyAtEA_w((code >> 3) & 7, code & 7);
 	negative = d < 0;
 	zero = d == 0;
@@ -2393,7 +2393,7 @@ void ori_l(void)
 {
 	register w32 d;
 
-	d = RL((w32 *)pc);
+	d = RL_PC((w32 *)pc);
 	pc += 2;
 	d = d | ModifyAtEA_l((code >> 3) & 7, code & 7);
 	negative = d < 0;
@@ -2405,7 +2405,7 @@ void ori_l(void)
 void ori_to_ccr(void)
 {
 	register w16 d;
-	d = (w16)RW(pc++);
+	d = (w16)RW_PC(pc++);
 	carry = carry || ((d & 1) != 0);
 	overflow = overflow || ((d & 2) != 0);
 	zero = zero || ((d & 4) != 0);
@@ -2416,7 +2416,7 @@ void ori_to_ccr(void)
 void ori_to_sr(void)
 {
 	register w16 d;
-	d = (w16)RW(pc++);
+	d = (w16)RW_PC(pc++);
 	if (supervisor) {
 		PutSR(GetSR() | d);
 	} else {

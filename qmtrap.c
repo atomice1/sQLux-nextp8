@@ -23,7 +23,7 @@ rep:
         while(likely(--nInst>=0 && oldPC!=pc) /* && oldPC!=pc+1 && oldPC!=pc+2 */)
 	  {
 	    /*printf("PC=%x\n",(Ptr)pc-(Ptr)memBase); */
-	    tab[code=RW(pc++)&0xffff]();
+	    tab[code=RW_PC(pc++)&0xffff]();
 	  }
 
         if(extraFlag)

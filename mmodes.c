@@ -22,14 +22,14 @@ rw32 AREGP GetEA_m2(ashort r)
 
 rw32 AREGP GetEA_m5(ashort r)
 {
-	return aReg[r] + (w16)RW(pc++);
+	return aReg[r] + (w16)RW_PC(pc++);
 }
 
 rw32 AREGP GetEA_m6(ashort r)
 {
 	/*w16*/ shindex displ;
 
-	displ = (w16)RW(pc++);
+	displ = (w16)RW_PC(pc++);
 	if ((displ & 2048) != 0)
 		return *(((w32 *)((Ptr)reg + ((displ >> 10) & 60)))) + aReg[r] +
 		       (w32)((w8)displ);
@@ -43,16 +43,16 @@ rw32 AREGP GetEA_m7(ashort r)
 	/*w16*/ shindex displ;
 	switch (r) {
 	case 0:
-		displ = (w16)RW(pc++);
+		displ = (w16)RW_PC(pc++);
 		return displ;
 	case 1:
 		pc += 2;
-		return RL((w32 *)(pc - 2));
+		return RL_PC((w32 *)(pc - 2));
 	case 2:
-		displ = (w16)RW(pc++);
+		displ = (w16)RW_PC(pc++);
 		return (Ptr)pc - (Ptr)memBase - 2 + displ;
 	case 3:
-		displ = (w16)RW(pc++);
+		displ = (w16)RW_PC(pc++);
 		if ((displ & 2048) != 0)
 			return reg[(displ >> 12) & 15] + (Ptr)pc - (Ptr)memBase -
 			       2 + (w32)((w8)displ);
@@ -70,7 +70,7 @@ rw32 GetEA_m7_3(void)
 {
 	/*w16*/ shindex displ;
 
-	displ = (w16)RW(pc++);
+	displ = (w16)RW_PC(pc++);
 	if ((displ & 2048) != 0)
 		return reg[(displ >> 12) & 15] + (Ptr)pc - (Ptr)memBase - 2 +
 		       (w32)((w8)displ);
@@ -143,7 +143,7 @@ rw8 GetFromEA_b_m4(void)
 
 rw8 GetFromEA_b_m5(void)
 {
-	return ReadByte(aReg[code & 7] + (w16)RW(pc++));
+	return ReadByte(aReg[code & 7] + (w16)RW_PC(pc++));
 }
 
 rw8 GetFromEA_b_m6(void)
@@ -157,9 +157,9 @@ rw8 GetFromEA_b_m7(void)
 
 	switch (code & 7) {
 	case 0:
-		return ReadByte((w32)((w16)RW(pc++)));
+		return ReadByte((w32)((w16)RW_PC(pc++)));
 	case 1:
-		addr = RL((w32 *)pc);
+		addr = RL_PC((w32 *)pc);
 		pc += 2;
 		return ReadByte(addr);
 	case 2:
@@ -215,13 +215,13 @@ rw16 GetFromEA_w_m4(void)
 
 rw16 GetFromEA_w_m5(void)
 {
-	return ReadWord(aReg[code & 7] + (w16)RW(pc++));
+	return ReadWord(aReg[code & 7] + (w16)RW_PC(pc++));
 }
 
 rw16 GetFromEA_w_m6()
 {
 	/*w16*/ shindex displ;
-	displ = (w16)RW(pc++);
+	displ = (w16)RW_PC(pc++);
 	return ReadWord(((displ & 2048) != 0) ?
 				(*((w32 *)((Ptr)reg + ((displ >> 10) & 60))) +
 				 aReg[code & 7] + (w32)((w8)displ)) :
@@ -236,9 +236,9 @@ rw16 GetFromEA_w_m7(void)
 
 	switch (code & 7) {
 	case 0:
-		return ReadWord((w32)((w16)RW(pc++)));
+		return ReadWord((w32)((w16)RW_PC(pc++)));
 	case 1:
-		addr = RL((w32 *)pc);
+		addr = RL_PC((w32 *)pc);
 		pc += 2;
 		return ReadWord(addr);
 	case 2:
@@ -248,7 +248,7 @@ rw16 GetFromEA_w_m7(void)
 	case 3:
 		return ReadWord(GetEA_m7_3());
 	case 4:
-		return (w16)RW(pc++);
+		return (w16)RW_PC(pc++);
 	}
 	exception = 4;
 	extraFlag = true;
@@ -293,7 +293,7 @@ rw32 GetFromEA_l_m4(void)
 
 rw32 GetFromEA_l_m5(void)
 {
-	return ReadLong(aReg[code & 7] + (w16)RW(pc++));
+	return ReadLong(aReg[code & 7] + (w16)RW_PC(pc++));
 }
 
 rw32 GetFromEA_l_m6(void)
@@ -307,9 +307,9 @@ rw32 GetFromEA_l_m7(void)
 
 	switch (code & 7) {
 	case 0:
-		return ReadLong((w32)((w16)RW(pc++)));
+		return ReadLong((w32)((w16)RW_PC(pc++)));
 	case 1:
-		addr = RL((w32 *)pc); /* *((w32*)pc); */
+		addr = RL_PC((w32 *)pc); /* *((w32*)pc); */
 		pc += 2;
 		return ReadLong(addr);
 	case 2:
@@ -320,7 +320,7 @@ rw32 GetFromEA_l_m7(void)
 		return ReadLong(GetEA_m7_3());
 	case 4:
 		pc += 2;
-		return RL((w32 *)(pc - 2));
+		return RL_PC((w32 *)(pc - 2));
 	}
 	exception = 4;
 	extraFlag = true;
@@ -366,7 +366,7 @@ void AREGP PutToEA_b_m4(ashort r, aw8 d)
 
 void AREGP PutToEA_b_m5(ashort r, aw8 d)
 {
-	WriteByte(aReg[r] + (w16)RW(pc++), d);
+	WriteByte(aReg[r] + (w16)RW_PC(pc++), d);
 }
 
 void AREGP PutToEA_b_m6(ashort r, aw8 d)
@@ -411,7 +411,7 @@ void AREGP PutToEA_w_m4(ashort r, aw16 d)
 
 void AREGP PutToEA_w_m5(ashort r, aw16 d)
 {
-	WriteWord(aReg[r] + (w16)RW(pc++), d);
+	WriteWord(aReg[r] + (w16)RW_PC(pc++), d);
 }
 
 void AREGP PutToEA_w_m6(ashort r, aw16 d)
@@ -453,7 +453,7 @@ void AREGP PutToEA_l_m4(ashort r, aw32 d)
 
 void AREGP PutToEA_l_m5(ashort r, aw32 d)
 {
-	WriteLong(aReg[r] + (w16)RW(pc++), d);
+	WriteLong(aReg[r] + (w16)RW_PC(pc++), d);
 }
 
 void AREGP PutToEA_l_m6(ashort r, aw32 d)

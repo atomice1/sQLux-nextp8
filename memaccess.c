@@ -182,10 +182,10 @@ rw8 ModifyAtEA_b(ashort mode,ashort r)
 		addr = --aReg[r];
 		break;
 	case 5:
-		addr = aReg[r] + (w16)RW(pc++);
+		addr = aReg[r] + (w16)RW_PC(pc++);
 		break;
 	case 6:
-		displ = (w16)RW(pc++);
+		displ = (w16)RW_PC(pc++);
 		if ((displ & 2048) != 0)
 			addr = reg[(displ >> 12) & 15] +
 			       aReg[r] + (w32)((w8)displ);
@@ -197,10 +197,10 @@ rw8 ModifyAtEA_b(ashort mode,ashort r)
 		switch (r)
 		{
 		case 0:
-			addr = (w16)RW(pc++);
+			addr = (w16)RW_PC(pc++);
 			break;
 		case 1:
-			addr = RL((w32 *)pc);
+			addr = RL_PC((w32 *)pc);
 			pc += 2;
 			break;
 		default:
@@ -263,10 +263,10 @@ rw16 ModifyAtEA_w(ashort mode,ashort r)
 		addr = (aReg[r] -= 2);
 		break;
 	case 5:
-		addr = aReg[r] + (w16)RW(pc++);
+		addr = aReg[r] + (w16)RW_PC(pc++);
 		break;
 	case 6:
-		displ = (w16)RW(pc++);
+		displ = (w16)RW_PC(pc++);
 		if ((displ & 2048) != 0)
 			addr = reg[(displ >> 12) & 15] +
 			       aReg[r] + (w32)((w8)displ);
@@ -278,10 +278,10 @@ rw16 ModifyAtEA_w(ashort mode,ashort r)
 		switch (r)
 		{
 		case 0:
-			addr = (w16)RW(pc++);
+			addr = (w16)RW_PC(pc++);
 			break;
 		case 1:
-			addr = RL((w32 *)pc);
+			addr = RL_PC((w32 *)pc);
 			pc += 2;
 			break;
 		default:
@@ -331,10 +331,10 @@ rw32 ModifyAtEA_l(ashort mode, ashort r)
 		addr = (aReg[r] -= 4);
 		break;
 	case 5:
-		addr = aReg[r] + (w16)RW(pc++);
+		addr = aReg[r] + (w16)RW_PC(pc++);
 		break;
 	case 6:
-		displ = (w16)RW(pc++);
+		displ = (w16)RW_PC(pc++);
 		if ((displ & 2048) != 0)
 			addr = reg[(displ >> 12) & 15] +
 			       aReg[r] + (w32)((w8)displ);
@@ -346,10 +346,10 @@ rw32 ModifyAtEA_l(ashort mode, ashort r)
 		switch (r)
 		{
 		case 0:
-			addr = (w16)RW(pc++);
+			addr = (w16)RW_PC(pc++);
 			break;
 		case 1:
-			addr = RL((w32 *)pc);
+			addr = RL_PC((w32 *)pc);
 			pc += 2;
 			break;
 		default:

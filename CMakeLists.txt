@@ -129,6 +129,7 @@ if(PROFILER)
     profiler/profiler_grouped.cpp
     profiler/profiler_invariants.cpp
     profiler/profiler_callgrind.cpp
+    profiler/profiler_cost_model.cpp
     profiler/profiler_consumer.cpp
     profiler/profiler_thread.cpp
     profiler/profiler_client.cpp

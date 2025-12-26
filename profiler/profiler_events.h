@@ -9,6 +9,10 @@
 
 #include <stdint.h>
 
+#ifdef PROFILER
+#include "profiler_cost_model.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -51,6 +55,9 @@ static inline void Profiler_RecordDataRead(uint32_t address) {
     *profiler_current_buffer_ptr++ = (address & 0xffffff) | 0x40000000;
     if (profiler_current_buffer_ptr == profiler_buffer_end_ptr)
         Profiler_SwitchBuffer();
+#ifdef PROFILER
+    Profiler_RecordDataReadCycles();
+#endif
 }
 
 static inline void Profiler_RecordDataWrite(uint32_t address) {
@@ -58,12 +65,18 @@ static inline void Profiler_RecordDataWrite(uint32_t address) {
     if (profiler_current_buffer_ptr == profiler_buffer_end_ptr) {
         Profiler_SwitchBuffer();
     }
+#ifdef PROFILER
+    Profiler_RecordDataWriteCycles();
+#endif
 }
 
 static inline void Profiler_RecordInstrRead(uint32_t address) {
     *profiler_current_buffer_ptr++ = (address & 0xffffff) | 0x60000000;
     if (profiler_current_buffer_ptr == profiler_buffer_end_ptr)
         Profiler_SwitchBuffer();
+#ifdef PROFILER
+    Profiler_RecordInstrReadCycles();
+#endif
 }
 
 #ifdef __cplusplus

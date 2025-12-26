@@ -469,7 +469,7 @@ void ExecuteLoop(void)  /* fetch and dispatch loop */
       // Record instruction execution
       Profiler_RecordInstructionExecute((w32)((void*)pc-(void*)memBase));
 #endif
-      qlux_table[code=RW(pc++)&0xffff]();
+      qlux_table[code=RW_PC(pc++)&0xffff]();
     }
 
   if (SDL_AtomicGet(&doPoll)) dosignal();

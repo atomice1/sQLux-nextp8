@@ -291,8 +291,29 @@ static inline void _wl_(uw32 *d, uw32 v)
 	*d = SDL_SwapBE32(v);
 }
 
+#ifdef PROFILER
+#include "profiler/profiler_events.h"
+// Separate macros for instruction fetches from PC
+static inline ruw16 _rw_pc_(uw16 *s) {
+	uw32 addr = (uw32)(uintptr_t)s - (uw32)(uintptr_t)memBase;
+	Profiler_RecordInstrRead(addr);
+	return SDL_SwapBE16(*s);
+}
+static inline ruw32 _rl_pc_(uw32 *s) {
+	uw32 addr = (uw32)(uintptr_t)s - (uw32)(uintptr_t)memBase;
+	Profiler_RecordInstrRead(addr);
+	Profiler_RecordInstrRead(addr + 2);  // 32-bit read is two 16-bit fetches
+	return SDL_SwapBE32(*s);
+}
+#define RW_PC(_r_a) _rw_pc_((uw16 *)(_r_a))
+#define RL_PC(_r_al) _rl_pc_((uw32 *)(_r_al))
+#else
+#define RW_PC(_r_a) _rw_((uw16 *)(_r_a))
+#define RL_PC(_r_al) _rl_((uw32 *)(_r_al))
+#endif
+
 #ifndef RW
-#define RW(_r_a) _rw_((uw32 *)(_r_a))
+#define RW(_r_a) _rw_((uw16 *)(_r_a))
 #endif
 #ifndef RL
 #define RL(_r_al) _rl_((uw32 *)(_r_al))

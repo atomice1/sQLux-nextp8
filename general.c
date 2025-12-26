@@ -25,6 +25,10 @@
 #include "uart.h"
 #endif
 
+#ifdef PROFILER
+#include "profiler/profiler_cost_model.h"
+#endif
+
 #include <signal.h>
 #include <time.h>
 #include <assert.h>
@@ -532,18 +536,28 @@ rw16 ReadHWWord(aw32 addr)
 	case _DA_CONTROL:
 		return da_address;
 	case _UTIMER_1MHZ_HI: {
+#ifdef PROFILER
+		// Use profiler cycle count for deterministic timing
+		uint32_t utimer_1mhz = Profiler_CyclesToMicroseconds(Profiler_GetCycleCount());
+#else
 		struct timespec ts;
 		clock_gettime(CLOCK_MONOTONIC, &ts);
 		uint32_t utimer_1mhz = ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+#endif
 		utbuf_1mhz = utimer_1mhz & 0xffff;
 		return (utimer_1mhz >> 16) & 0xffff;
 	}
 	case _UTIMER_1MHZ_LO:
 		return utbuf_1mhz;
 	case _UTIMER_1KHZ_HI: {
+#ifdef PROFILER
+		// Use profiler cycle count for deterministic timing
+		uint32_t utimer_1khz = Profiler_CyclesToMilliseconds(Profiler_GetCycleCount());
+#else
 		struct timespec ts;
 		clock_gettime(CLOCK_MONOTONIC, &ts);
 		uint32_t utimer_1khz = ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+#endif
 		utbuf_1khz = utimer_1khz & 0xffff;
 		return (utimer_1khz >> 16) & 0xffff;
 	}

@@ -244,7 +244,7 @@ void sf(void)
 
 void stop(void)
 {
-	uw16 imm = (w16)RW(pc++);
+	uw16 imm = (w16)RW_PC(pc++);
 	printf("stop #0x%x\n", (unsigned)imm);
 	DumpState();
 	pc++;
@@ -395,7 +395,7 @@ void subi_b(void)
 {
 	w8 r, s;
 	w8 d;
-	s = (w8)RW(pc++);
+	s = (w8)RW_PC(pc++);
 	d = ModifyAtEA_b((code >> 3) & 7, code & 7);
 	r = d - s;
 	negative = r < 0;
@@ -412,7 +412,7 @@ void subi_w(void)
 	w16 r, s;
 	w16 d;
 	;
-	s = (w16)RW(pc++);
+	s = (w16)RW_PC(pc++);
 	d = ModifyAtEA_w((code >> 3) & 7, code & 7);
 	r = d - s;
 	negative = r < 0;
@@ -430,7 +430,7 @@ void subi_l(void)
 	w32 r, s;
 	w32 d;
 	;
-	s = RL((w32 *)pc);
+	s = RL_PC((w32 *)pc);
 	pc += 2;
 	d = ModifyAtEA_l((code >> 3) & 7, code & 7);
 	r = d - s;
