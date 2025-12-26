@@ -174,7 +174,7 @@ void ProfilerThread::FlushToFile() {
     if (!serializer_.WriteToFile(output_filename_, grouped)) {
         std::cerr << "Failed to write profiler data to " << output_filename_ << std::endl;
     } else {
-        std::cout << "Profiler data flushed to " << output_filename_ << std::endl;
+        //std::cout << "Profiler data flushed to " << output_filename_ << std::endl;
     }
 }
 

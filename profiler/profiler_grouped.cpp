@@ -20,30 +20,6 @@ void GroupedProfilerData::SetTotalInstructions(uint64_t total) {
     total_instructions_ = total;
 }
 
-namespace {
-    void DumpCost(const std::map<uint32_t, InstructionCost>& costs, uint32_t addr) {
-        if (costs.find(addr) == costs.end()) {
-            printf("No InstructionCost at %x\n", addr);
-            return;
-        }
-        printf("InstructionCost at %x: self_cost=%lu\n",
-            addr, (unsigned long)costs.at(addr).self_cost);
-        // Now dump callees and jumps:
-        for (const auto& call_entry : costs.at(addr).calls) {
-            uint32_t target = call_entry.first;
-            const auto& call_info = call_entry.second;
-            printf("  calls to 0x%X: call_count=%lu, inclusive_instructions=%lu\n",
-                target, (unsigned long)call_info.call_count, (unsigned long)call_info.inclusive_instructions);
-        }
-        for (const auto& jump_entry : costs.at(addr).jumps) {
-            uint32_t jump_target = jump_entry.first;
-            const auto& jump_info = jump_entry.second;
-            printf("  jumps to 0x%X: call_count=%lu, inclusive_instructions=%lu\n",
-                jump_target, (unsigned long)jump_info.call_count, (unsigned long)jump_info.inclusive_instructions);
-        }
-    }
-}
-
 GroupedProfilerData ConvertToGroupedData(const ProfilerData& data) {
     GroupedProfilerData grouped;
     grouped.SetTotalInstructions(data.GetTotalInstructions());
@@ -53,11 +29,6 @@ GroupedProfilerData ConvertToGroupedData(const ProfilerData& data) {
     if (costs.empty()) {
         return grouped;
     }
-
-    DumpCost(costs, 0x400);
-    DumpCost(costs, 0x418);
-    DumpCost(costs, 0x41a);
-    DumpCost(costs, 0x41c);
 
     // Collect all function entry points:
     // 1. Call targets (functions called by other code)
