@@ -47,7 +47,10 @@ struct emuOpts {
 	char *charVal;
 };
 
-struct emuOpts emuOptions[] = {
+static emuOpts emuOptions[] = {
+#ifdef NEXTP8
+{"app_args", "", "command line arguments to pass to the application", EMU_OPT_CHAR, 0, NULL},
+#endif
 #ifndef NEXTP8
 {"bdi1", "", "file exposed by the BDI interface", EMU_OPT_CHAR, 0 , NULL},
 {"boot_cmd", "b", "command to run on boot (executed in basic)", EMU_OPT_CHAR, 0, NULL},
@@ -57,6 +60,7 @@ struct emuOpts emuOptions[] = {
 #ifndef NEXTP8
 {"cpu_hog", "", "1 = use all cpu, 0 = sleep when idle", EMU_OPT_INT, 1, NULL},
 {"device", "", "QDOS_name,path,flags (may be used multiple times", EMU_OPT_DEV, 0, NULL},
+{"exit_action", "", "0 = restart on exit, 1 = shutdown on exit", EMU_OPT_INT, 0, NULL},
 {"fast_startup", "", "1 = skip ram test (does not affect Minerva)", EMU_OPT_INT, 0, NULL},
 #endif
 {"filter", "", "enable bilinear filter when zooming", EMU_OPT_INT, 0, NULL},

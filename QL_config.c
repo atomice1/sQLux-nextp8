@@ -441,5 +441,38 @@ void WriteConfigPage(void)
 	struct _config_data *configData = (struct _config_data *)(((char *)memBase) + _CONFIG_BASE_ROM);
 	memset(configData, 0, sizeof(struct _config_data));
 	strcpy(&configData->core_path, "/MACHINES/NEXTP8");
+
+	configData->exit_action = emulatorOptionInt("exit_action");
+
+	const char *app_args = emulatorOptionString("app_args");
+	if (app_args && strlen(app_args) > 0) {
+		char *dst = configData->cmdline;
+		char *dst_end = dst + sizeof(configData->cmdline) - 2;
+		const char *src = app_args;
+		int in_quote = 0;
+		int arg_started = 0;
+
+		while (*src && dst < dst_end) {
+			if (*src == '"') {
+				in_quote = !in_quote;
+				src++;
+			} else if ((*src == ' ' || *src == '\t') && !in_quote) {
+				if (arg_started) {
+					*dst++ = '\0';
+					arg_started = 0;
+				}
+				src++;
+			} else {
+				*dst++ = *src++;
+				arg_started = 1;
+			}
+		}
+
+		if (arg_started && dst < dst_end)
+			*dst++ = '\0';
+
+		if (dst < dst_end + 1)
+			*dst = '\0';
+	}
 }
 #endif

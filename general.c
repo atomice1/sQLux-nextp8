@@ -329,6 +329,11 @@ void WriteHWByte(aw32 addr, aw8 d)
 	case _OVERLAY_CONTROL:
 		overlay_control = d;
 		break;
+	case _RESET_REQ:
+		printf("RESET_REQ: 0x%02x\n", d & 0xff);
+		printf("Shutdown requested by application\n");
+		cleanup(0);
+		break;
 #else
 	case 0x018063: /* Display control */
 		SetDisplay(d, true);
