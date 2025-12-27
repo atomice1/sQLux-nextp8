@@ -47,7 +47,7 @@ struct emuOpts {
 	char *charVal;
 };
 
-static emuOpts emuOptions[] = {
+struct emuOpts emuOptions[] = {
 #ifdef NEXTP8
 {"app_args", "", "command line arguments to pass to the application", EMU_OPT_CHAR, 0, NULL},
 #endif
