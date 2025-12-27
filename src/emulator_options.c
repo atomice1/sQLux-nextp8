@@ -57,10 +57,11 @@ struct emuOpts emuOptions[] = {
 {"boot_device", "d", "device to load BOOT file from", EMU_OPT_CHAR, 0, "mdv1"},
 #endif
 {"cart", "", "p8 cart", EMU_OPT_CHAR, 0, NULL},
-#ifndef NEXTP8
+#ifdef NEXTP8
+{"exit_action", "", "0 = restart on exit, 1 = shutdown on exit", EMU_OPT_INT, 0, NULL},
+#else
 {"cpu_hog", "", "1 = use all cpu, 0 = sleep when idle", EMU_OPT_INT, 1, NULL},
 {"device", "", "QDOS_name,path,flags (may be used multiple times", EMU_OPT_DEV, 0, NULL},
-{"exit_action", "", "0 = restart on exit, 1 = shutdown on exit", EMU_OPT_INT, 0, NULL},
 {"fast_startup", "", "1 = skip ram test (does not affect Minerva)", EMU_OPT_INT, 0, NULL},
 #endif
 {"filter", "", "enable bilinear filter when zooming", EMU_OPT_INT, 0, NULL},
