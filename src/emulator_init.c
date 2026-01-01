@@ -18,6 +18,9 @@
 #include "QL_cconv.h"
 #include "QL_hardware.h"
 #include "QL_screen.h"
+#ifdef NEXTP8
+#include "sdspi.h"
+#endif
 #include "sds.h"
 #include "unixstuff.h"
 #include "version.h"
@@ -124,6 +127,7 @@ void emulatorInit()
 	const char *rom1 = emulatorOptionString("rom1");
 	const char *rom2 = emulatorOptionString("rom2");
 	const char *cart = emulatorOptionString("cart");
+	const char *sdcard = emulatorOptionString("sdcard");
 #else
     const char *sysrom = emulatorOptionString("sysrom");
 	const char *romport = emulatorOptionString("romport");
@@ -153,6 +157,11 @@ void emulatorInit()
 			fprintf(stderr, "Error Loading cart %s\n", cart);
 			exit(ret);
 		}
+	}
+	
+	// Initialize SD card emulation
+	if (strlen(sdcard)) {
+		SDSPI_Init(sdcard);
 	}
 #else
 	ret = emulatorLoadRom(romdir, sysrom, QL_ROM_BASE, QL_ROM_SIZE);

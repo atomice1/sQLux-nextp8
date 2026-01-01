@@ -90,6 +90,9 @@ struct emuOpts emuOptions[] = {
 {"rom2", "", "rom 2", EMU_OPT_CHAR, 0, ""},
 #endif
 {"romdir", "", "path to the roms", EMU_OPT_CHAR, 0, "roms"},
+#ifdef NEXTP8
+{"sdcard", "", "path to the SD card image", EMU_OPT_CHAR, 0, "sdcard.img"},
+#endif
 #ifndef NEXTP8
 {"romport", "", "rom in QL rom port (0xC000 address)", EMU_OPT_CHAR, 0, NULL},
 {"romim", "", "rom in QL rom port (0xC000 address, legacy alias for romport)", EMU_OPT_CHAR, 0, NULL},
