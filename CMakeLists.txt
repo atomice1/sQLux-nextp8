@@ -199,7 +199,7 @@ add_executable(
 set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/version.c
   PROPERTIES GENERATED TRUE)
 set_source_files_properties(p8_audio.c
-    PROPERTIES COMPILE_FLAGS "-UNEXTP8 -DSDL")
+    PROPERTIES COMPILE_FLAGS "-UNEXTP8 -DSDL -DENABLE_AUDIO")
 
 add_dependencies(${SQLUX_EXECUTABLE_NAME} SubmarineGitVersion)
 

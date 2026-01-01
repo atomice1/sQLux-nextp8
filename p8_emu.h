@@ -10,6 +10,8 @@ extern w32 *memBase;
 
 #define MEMORY_MUSIC (p8audio_music_base_lo | (p8audio_music_base_hi << 16))
 #define MEMORY_SFX (p8audio_sfx_base_lo | (p8audio_sfx_base_hi << 16))
+#define MEMORY_MISCFLAGS (0)
+#define MEMORY_SIZE (1024 * 64)
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
