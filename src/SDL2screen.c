@@ -842,6 +842,10 @@ unsigned int sdl_keyrow[32] = { 0, 0, 0, 0, 0, 0, 0, 0,
 							    0, 0, 0, 0, 0, 0, 0, 0,
 							    0, 0, 0, 0, 0, 0, 0, 0,
 							    0, 0, 0, 0, 0, 0, 0, 0 };
+unsigned int sdl_keyrow_latched[32] = { 0, 0, 0, 0, 0, 0, 0, 0,
+										0, 0, 0, 0, 0, 0, 0, 0,
+										0, 0, 0, 0, 0, 0, 0, 0,
+										0, 0, 0, 0, 0, 0, 0, 0 };
 #else
 unsigned int sdl_keyrow[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 #endif
@@ -858,10 +862,15 @@ static void SDLQLKeyrowChg(int code, int press)
 #endif
 	int col = 0x1 << (code % 8);
 
-	if (press)
+	if (press) {
+#ifdef NEXTP8
+		if (!(sdl_keyrow[row] & col))
+			sdl_keyrow_latched[row] |= col;
+#endif
 		sdl_keyrow[row] |= col;
-	else
+	} else {
 		sdl_keyrow[row] &= ~col;
+	}
 }
 
 // Adjust for Windows and X11 generating different scan codes for dead keys
@@ -1216,7 +1225,7 @@ void QLSDProcessKey(SDL_Keysym *keysym, int pressed)
 	int i = 0;
 	//printf("Key %8x Scan %8x P: %i SH: %d ALT: %d CTRL: %d GRF: %d\n",
 	//	keysym->sym, keysym->scancode, pressed,
-	// 	sdl_shiftstate, sdl_altstate, sdl_controlstate,
+	//	sdl_shiftstate, sdl_altstate, sdl_controlstate,
 	//	sdl_grfstate); fflush(stdout);
 
 	/* Handle key pad entries that require shift - with the US keyboard */

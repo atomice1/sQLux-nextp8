@@ -403,6 +403,11 @@ void WriteHWByte(aw32 addr, aw8 d)
 			screenPalette[addr - _PALETTE_BASE] = d;
 			return;
 		}
+		if (addr >= _KEYBOARD_MATRIX_LATCHED &&
+			addr < _KEYBOARD_MATRIX_LATCHED + 0x20) {
+			sdl_keyrow_latched[addr - _KEYBOARD_MATRIX_LATCHED] &= ~d;
+			return;
+		}
 #endif
 		debug2("Write to HW register ", addr);
 		debug2("at (PC-2) ", (Ptr)pc - (Ptr)memBase - 2);
@@ -505,6 +510,10 @@ rw8 ReadHWByte(aw32 addr)
 			// read from keyboard
 			return sdl_keyrow[addr - _KEYBOARD_MATRIX];
 		}
+		if (addr >= _KEYBOARD_MATRIX_LATCHED &&
+			addr < _KEYBOARD_MATRIX_LATCHED + 0x20) {
+			return sdl_keyrow_latched[addr - _KEYBOARD_MATRIX_LATCHED];
+		}
 		if (addr >= _DA_MEMORY_BASE && addr < _DA_MEMORY_BASE + _DA_MEMORY_SIZE) {
 			if ((addr & 1) == 0)
 				return da_memory[(addr - _DA_MEMORY_BASE) >> 1] >> 8;
@@ -599,7 +608,9 @@ void WriteHWWord(aw32 addr, aw16 d)
 		!(addr >= _FRONT_BUFFER_BASE && addr < _FRONT_BUFFER_BASE + _FRAME_BUFFER_SIZE) &&
 		!(addr >= _OVERLAY_BACK_BUFFER_BASE && addr < _OVERLAY_BACK_BUFFER_BASE + 8192) &&
 		!(addr >= _OVERLAY_FRONT_BUFFER_BASE && addr < _OVERLAY_FRONT_BUFFER_BASE + 8192) &&
-		!(addr >= _PALETTE_BASE && addr < _PALETTE_BASE + _PALETTE_SIZE))
+		!(addr >= _PALETTE_BASE && addr < _PALETTE_BASE + _PALETTE_SIZE) &&
+		!(addr >= _KEYBOARD_MATRIX_LATCHED && addr < _KEYBOARD_MATRIX_LATCHED + 0x20) &&
+		addr != _JOYSTICK0_LATCHED && addr != _JOYSTICK1_LATCHED && addr != _MOUSE_BUTTONS_LATCHED)
 		printf("WriteHWWord at 0x%lx val=0x%x\n", (unsigned long) addr, ((unsigned) d) & 0xffff);
 	switch (addr) {
 #ifdef NEXTP8
