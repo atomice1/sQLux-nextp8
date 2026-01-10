@@ -9,6 +9,7 @@
 #include "general.h"
 #include "QL_screen.h"
 #include "SDL2screen.h"
+#include "unixstuff.h"
 #include <unistd.h>
 
 #ifdef PROFILER
@@ -83,11 +84,17 @@ rw32 ReadLong(aw32 addr)
 void WriteByte(aw32 addr,aw8 d)
 {
 	addr &= ADDR_MASK;
-	
+
 #ifdef PROFILER
 	Profiler_RecordDataWrite(addr);
 #endif
-	
+
+	if (addr == 0x7ffffe || addr == 0x7fffff || addr == 0x800000 || addr < 32768) {
+		printf("\n*** Write to non-writable address 0x%x (value=0x%02x) ***\n", addr, d & 0xff);
+		DbgInfo();
+		exit(1);
+	}
+
 	if (addr == 0xfffffe) {
 		write(1, &d, 1);
 		return;
@@ -116,6 +123,12 @@ void WriteWord(aw32 addr,aw16 d)
 	Profiler_RecordDataWrite(addr);
 #endif
 
+	if (addr == 0x7ffffe || addr == 0x7fffff || addr == 0x800000 || addr < 32768) {
+		printf("\n*** Write to noh-writable address 0x%x (value=0x%04x) ***\n", addr, d & 0xffff);
+		DbgInfo();
+		exit(1);
+	}
+
 	if (is_hw(addr)) {
 		WriteHWWord(addr, d);
 		return;
@@ -123,7 +136,7 @@ void WriteWord(aw32 addr,aw16 d)
 
 	if ((addr >= RTOP) && (addr >= qlscreen.qm_hi))
 		return;
-	
+
 	if (addr >= QL_SCREEN_BASE)
 		WW((Ptr)memBase + addr, d);
 }
@@ -135,6 +148,12 @@ void WriteLong(aw32 addr,aw32 d)
 #ifdef PROFILER
 	Profiler_RecordDataWrite(addr);
 #endif
+
+	if (addr == 0x7ffffe || addr == 0x7fffff || addr == 0x800000 || addr < 32768) {
+		printf("\n*** Write to non-writable address 0x%x (value=0x%08x) ***\n", addr, d);
+		DbgInfo();
+		exit(1);
+	}
 
 	if (is_hw(addr)) {
 		WriteHWWord(addr, d >> 16);

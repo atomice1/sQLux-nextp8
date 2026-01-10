@@ -37,6 +37,7 @@
 #include "xcodes.h"
 #include "QL_config.h"
 #include "QInstAddr.h"
+#include "memaccess.h"
 
 #include "unix.h"
 #include "boot.h"
@@ -270,6 +271,16 @@ void DbgInfo(void)
 	printf("Register Dump:\t Dn\t\tAn\n");
 	for (i = 0; i < 8; i++)
 		printf("%d\t\t%8x\t%8x\n", i, reg[i], aReg[i]);
+
+	/* Print stack trace */
+	printf("\nStack trace (return addresses on stack):\n");
+	w32 sp = *m68k_sp;
+	for (i = 0; i < 20 && sp < 0x400000; i++) {
+		if (sp < 32768) break;  /* Don't read low memory */
+		w32 addr = ReadLong(sp);
+		printf("  [SP+%04x] = 0x%08x\n", (sp - *m68k_sp), addr);
+		sp += 4;
+	}
 }
 
 long uqlx_tz;
