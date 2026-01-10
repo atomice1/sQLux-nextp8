@@ -852,6 +852,16 @@ unsigned int sdl_keyrow[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 int sdl_shiftstate, sdl_controlstate, sdl_altstate, sdl_grfstate;
 int usegrfstate = 0;
 
+#ifdef NEXTP8
+int16_t sdl_mouse_x_accum = 0;  // Hardware register value (1/4 pixel units)
+int16_t sdl_mouse_y_accum = 0;  // Hardware register value (1/4 pixel units)
+int16_t sdl_mouse_z_accum = 0;  // 16-bit scroll accumulator
+int sdl_mouse_x_prev_scaled = 0;  // Where app thinks cursor is (1/4 pixel units)
+int sdl_mouse_y_prev_scaled = 0;  // Where app thinks cursor is (1/4 pixel units)
+unsigned int sdl_mouse_buttons = 0;
+unsigned int sdl_mouse_buttons_latched = 0;
+#endif
+
 static void SDLQLKeyrowChg(int code, int press)
 {
 	code &= 0xff; // Make sure that array bounds are not exceeded
@@ -1720,14 +1730,89 @@ void QLSDLProcessEvents(void)
 		break;
 	case SDL_MOUSEMOTION:
 		QLProcessMouse(event.motion.x, event.motion.y);
+#ifdef NEXTP8
+		// Handle mouse motion with 1/4 pixel precision
+		int mouse_xrel_scaled, mouse_yrel_scaled;
+		// Check if cursor is within the window bounds
+		if (event.motion.x >= dest_rect.x && event.motion.x <= (dest_rect.w + dest_rect.x) &&
+		    event.motion.y >= dest_rect.y && event.motion.y <= (dest_rect.h + dest_rect.y)) {
+			// Inside window: use absolute position
+			int mouse_x_scaled = (event.motion.x - dest_rect.x) * 4 * 128 / dest_rect.w;
+			int mouse_y_scaled = (event.motion.y - dest_rect.y) * 4 * 128 / dest_rect.h;
+			mouse_xrel_scaled = mouse_x_scaled - sdl_mouse_x_prev_scaled;
+			mouse_yrel_scaled = mouse_y_scaled - sdl_mouse_y_prev_scaled;
+		} else {
+			// Outside window: use relative movement
+			mouse_xrel_scaled = event.motion.xrel * 4 * 128 / dest_rect.w;
+			mouse_yrel_scaled = event.motion.yrel * 4 * 128 / dest_rect.h;
+		}
+		sdl_mouse_x_accum += mouse_xrel_scaled;
+		sdl_mouse_y_accum += mouse_yrel_scaled;
+		sdl_mouse_x_prev_scaled += mouse_xrel_scaled;
+		sdl_mouse_y_prev_scaled += mouse_yrel_scaled;
+		// Clamp prev_scaled to screen bounds (1/4 pixel units: 0 to 128*4-1)
+		if (sdl_mouse_x_prev_scaled < 0) sdl_mouse_x_prev_scaled = 0;
+		if (sdl_mouse_x_prev_scaled >= 128 * 4) sdl_mouse_x_prev_scaled = 128 * 4 - 1;
+		if (sdl_mouse_y_prev_scaled < 0) sdl_mouse_y_prev_scaled = 0;
+		if (sdl_mouse_y_prev_scaled >= 128 * 4) sdl_mouse_y_prev_scaled = 128 * 4 - 1;
+#endif
 		//inside=1;
 		break;
 	case SDL_MOUSEBUTTONDOWN:
 		QLButton(event.button.button, 1);
+#ifdef NEXTP8
+		switch (event.button.button) {
+		case SDL_BUTTON_LEFT:
+			sdl_mouse_buttons |= 0x01;
+			sdl_mouse_buttons_latched |= 0x01;
+			break;
+		case SDL_BUTTON_RIGHT:
+			sdl_mouse_buttons |= 0x02;
+			sdl_mouse_buttons_latched |= 0x02;
+			break;
+		case SDL_BUTTON_MIDDLE:
+			sdl_mouse_buttons |= 0x04;
+			sdl_mouse_buttons_latched |= 0x04;
+			break;
+		case SDL_BUTTON_X1:
+			sdl_mouse_buttons |= 0x08;
+			sdl_mouse_buttons_latched |= 0x08;
+			break;
+		case SDL_BUTTON_X2:
+			sdl_mouse_buttons |= 0x10;
+			sdl_mouse_buttons_latched |= 0x10;
+			break;
+		}
+#endif
 		break;
 	case SDL_MOUSEBUTTONUP:
 		QLButton(event.button.button, 0);
+#ifdef NEXTP8
+		switch (event.button.button) {
+		case SDL_BUTTON_LEFT:
+			sdl_mouse_buttons &= ~0x01;
+			break;
+		case SDL_BUTTON_RIGHT:
+			sdl_mouse_buttons &= ~0x02;
+			break;
+		case SDL_BUTTON_MIDDLE:
+			sdl_mouse_buttons &= ~0x04;
+			break;
+		case SDL_BUTTON_X1:
+			sdl_mouse_buttons &= ~0x08;
+			break;
+		case SDL_BUTTON_X2:
+			sdl_mouse_buttons &= ~0x10;
+			break;
+		}
+#endif
 		break;
+#ifdef NEXTP8
+	case SDL_MOUSEWHEEL:
+		// Accumulate scroll wheel into z position
+		sdl_mouse_z_accum += event.wheel.y;
+		break;
+#endif
 	case SDL_WINDOWEVENT:
 		if (event.window.windowID == ql_windowid) {
 			switch (event.window.event) {

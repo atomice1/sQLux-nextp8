@@ -408,6 +408,10 @@ void WriteHWByte(aw32 addr, aw8 d)
 			sdl_keyrow_latched[addr - _KEYBOARD_MATRIX_LATCHED] &= ~d;
 			return;
 		}
+		if (addr == _MOUSE_BUTTONS_LATCHED) {
+			sdl_mouse_buttons_latched &= ~d;
+			return;
+		}
 #endif
 		debug2("Write to HW register ", addr);
 		debug2("at (PC-2) ", (Ptr)pc - (Ptr)memBase - 2);
@@ -514,6 +518,12 @@ rw8 ReadHWByte(aw32 addr)
 			addr < _KEYBOARD_MATRIX_LATCHED + 0x20) {
 			return sdl_keyrow_latched[addr - _KEYBOARD_MATRIX_LATCHED];
 		}
+		if (addr == _MOUSE_BUTTONS) {
+			return sdl_mouse_buttons;
+		}
+		if (addr == _MOUSE_BUTTONS_LATCHED) {
+			return sdl_mouse_buttons_latched;
+		}
 		if (addr >= _DA_MEMORY_BASE && addr < _DA_MEMORY_BASE + _DA_MEMORY_SIZE) {
 			if ((addr & 1) == 0)
 				return da_memory[(addr - _DA_MEMORY_BASE) >> 1] >> 8;
@@ -579,6 +589,12 @@ rw16 ReadHWWord(aw32 addr)
 		return utbuf_1khz;
 	case _P8AUDIO_VERSION:
 		return P8AUDIO_VERSION;
+	case _MOUSE_X:
+		return (uint16_t)sdl_mouse_x_accum;
+	case _MOUSE_Y:
+		return (uint16_t)sdl_mouse_y_accum;
+	case _MOUSE_Z:
+		return (uint16_t)sdl_mouse_z_accum;
 #else
 	case 0x018108:
 		return SQLUXBDISizeHigh();

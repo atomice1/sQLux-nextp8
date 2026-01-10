@@ -25,6 +25,11 @@ void QLSDLCreateIcon(SDL_Window *window);
 #ifdef NEXTP8
 extern unsigned int sdl_keyrow[32];
 extern unsigned int sdl_keyrow_latched[32];
+extern int16_t sdl_mouse_x_accum;
+extern int16_t sdl_mouse_y_accum;
+extern int16_t sdl_mouse_z_accum;
+extern unsigned int sdl_mouse_buttons;
+extern unsigned int sdl_mouse_buttons_latched;
 #else
 extern unsigned int sdl_keyrow[8];
 #endif
