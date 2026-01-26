@@ -14,6 +14,10 @@
 #include "unixstuff.h"
 #include "Xscreen.h"
 
+#ifdef NEXTP8
+#include "i2c_rtc.h"
+#endif
+
 #ifdef PROFILER
 #include "profiler/profiler_api.h"
 #endif
@@ -100,6 +104,9 @@ void emu_loop() {
         init_done = 1;
     }
     if(init_done) {
+#ifdef NEXTP8
+        i2c_rtc_update();
+#endif
         QLSDLProcessEvents();
     }
 }

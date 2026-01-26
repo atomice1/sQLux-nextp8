@@ -21,9 +21,7 @@ static int is_hw(uint32_t addr)
 	if (((addr >= QL_INTERNAL_IO_BASE) &&
         	(addr < (QL_INTERNAL_IO_BASE + QL_INTERNAL_IO_SIZE))) ||
 		((addr >= QL_INTERNAL_MEM_BASE) &&
-			(addr < (QL_INTERNAL_MEM_BASE + QL_INTERNAL_MEM_SIZE))) ||
-		((addr >= 0x16000 && addr < 0x18000) ||
-	     (addr >= 0x15f10 && addr < 0x15f20))) {
+			(addr < (QL_INTERNAL_MEM_BASE + QL_INTERNAL_MEM_SIZE)))) {
 		return 1;
 	}
 

@@ -1,8 +1,9 @@
 TARGETS = build/sqlux build/compile_commands.json
 TARGETS_MINGW = build/sqlux.exe
+NEXTP8_BSP ?= $(CURDIR)/../nextp8-bsp
 
 ALL : ${TARGETS} 
-	cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=yes -DSUPPORT_SHADERS=yes -B build
+	cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=yes -DSUPPORT_SHADERS=yes "-DNEXTP8_BSP=${NEXTP8_BSP}" -B build
 	cmake --build build -j 8
 
 mingw32 : ${TARGETS_MINGW}

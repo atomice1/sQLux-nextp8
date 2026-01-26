@@ -41,7 +41,7 @@ void rwl_acc(int32_t d);
 #define QL_EXTERNAL_IO_BASE     0x21C000
 #define QL_EXTERNAL_IO_SIZE     0x4000
 #ifdef NEXTP8
-#define QL_SCREEN_BASE          0x10000
+#define QL_SCREEN_BASE          0x8000
 #else
 #define QL_SCREEN_BASE          0x80000
 #endif

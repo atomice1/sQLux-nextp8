@@ -20,6 +20,7 @@
 #include "QL_screen.h"
 #ifdef NEXTP8
 #include "sdspi.h"
+#include "i2c_rtc.h"
 #endif
 #include "sds.h"
 #include "unixstuff.h"
@@ -158,11 +159,14 @@ void emulatorInit()
 			exit(ret);
 		}
 	}
-	
+
 	// Initialize SD card emulation
 	if (strlen(sdcard)) {
 		SDSPI_Init(sdcard);
 	}
+
+	// Initialize I2C RTC emulation
+	i2c_rtc_init();
 #else
 	ret = emulatorLoadRom(romdir, sysrom, QL_ROM_BASE, QL_ROM_SIZE);
 	if (ret < 0) {

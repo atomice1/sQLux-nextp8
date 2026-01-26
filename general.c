@@ -23,6 +23,7 @@
 #include "sdspi.h"
 #include "p8audio.h"
 #include "uart.h"
+#include "i2c_rtc.h"
 #endif
 
 #ifdef PROFILER
@@ -326,6 +327,12 @@ void WriteHWByte(aw32 addr, aw8 d)
 		UART_SetDataIn(uart, d);
 		UART_TickAndReceive(12);
 		break;
+	case _I2C_DATA:
+		i2c_rtc_write_data(d);
+		break;
+	case _I2C_CTRL:
+		i2c_rtc_write_ctrl(d);
+		break;
 	case _OVERLAY_CONTROL:
 		overlay_control = d;
 		break;
@@ -451,6 +458,10 @@ rw8 ReadHWByte(aw32 addr)
 		UART_TickAndReceive(1);
 		return ret;
 	}
+	case _I2C_DATA:
+		return i2c_rtc_read_data();
+	case _I2C_STATUS:
+		return i2c_rtc_read_status();
 	case _OVERLAY_CONTROL:
 		return overlay_control;
 #else
@@ -551,7 +562,20 @@ rw8 ReadHWByte(aw32 addr)
 	return res;
 }
 
-static uint16_t utbuf_1mhz, utbuf_1khz;
+static uint64_t utimer_latched = 0;
+static unsigned utimer_last_slice = 3;
+
+static uint64_t GetUserTimer(void)
+{
+#ifdef PROFILER
+	// Use profiler cycle count for deterministic timing
+	return Profiler_CyclesToMicroseconds(Profiler_GetCycleCount());
+#else
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return ts.tv_sec * UINT64_C(1000000) + ts.tv_nsec / UINT64_C(1000);
+#endif
+}
 
 rw16 ReadHWWord(aw32 addr)
 {
@@ -559,34 +583,29 @@ rw16 ReadHWWord(aw32 addr)
 #ifdef NEXTP8
 	case _DA_CONTROL:
 		return da_address;
-	case _UTIMER_1MHZ_HI: {
-#ifdef PROFILER
-		// Use profiler cycle count for deterministic timing
-		uint32_t utimer_1mhz = Profiler_CyclesToMicroseconds(Profiler_GetCycleCount());
-#else
-		struct timespec ts;
-		clock_gettime(CLOCK_MONOTONIC, &ts);
-		uint32_t utimer_1mhz = ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
-#endif
-		utbuf_1mhz = utimer_1mhz & 0xffff;
-		return (utimer_1mhz >> 16) & 0xffff;
+	case _UTIMER_1MHZ_6348: {
+		utimer_latched = GetUserTimer();
+		utimer_last_slice = 0;
+		return (utimer_latched >> 48) & 0xffff;
 	}
-	case _UTIMER_1MHZ_LO:
-		return utbuf_1mhz;
-	case _UTIMER_1KHZ_HI: {
-#ifdef PROFILER
-		// Use profiler cycle count for deterministic timing
-		uint32_t utimer_1khz = Profiler_CyclesToMilliseconds(Profiler_GetCycleCount());
-#else
-		struct timespec ts;
-		clock_gettime(CLOCK_MONOTONIC, &ts);
-		uint32_t utimer_1khz = ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
-#endif
-		utbuf_1khz = utimer_1khz & 0xffff;
-		return (utimer_1khz >> 16) & 0xffff;
+	case _UTIMER_1MHZ_4732: {
+		if (utimer_last_slice != 0)
+			utimer_latched = GetUserTimer();
+		utimer_last_slice = 1;
+		return (utimer_latched >> 32) & 0xffff;
 	}
-	case _UTIMER_1KHZ_LO:
-		return utbuf_1khz;
+	case _UTIMER_1MHZ_3116: {
+		if (utimer_last_slice != 1)
+			utimer_latched = GetUserTimer();
+		utimer_last_slice = 2;
+		return (utimer_latched >> 16) & 0xffff;
+	}
+	case _UTIMER_1MHZ_1500: {
+		if (utimer_last_slice != 2)
+			utimer_latched = GetUserTimer();
+		utimer_last_slice = 3;
+		return utimer_latched & 0xffff;
+	}
 	case _P8AUDIO_VERSION:
 		return P8AUDIO_VERSION;
 	case _MOUSE_X:

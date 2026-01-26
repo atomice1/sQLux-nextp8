@@ -164,6 +164,7 @@ add_executable(
   Xscreen.c
   dummies.c
   general.c
+  i2c_rtc.c
   iexl_general.c
   instructions_ao.c
   instructions_pz.c

@@ -451,9 +451,12 @@ void ExecuteLoop(void)  /* fetch and dispatch loop */
       if (pc>tracelo) DoTrace();
 #endif
   if (asyncTrace) {
-      printf("%lx\n", (unsigned long)(w32)((void*)pc-(void*)memBase));
-      printf("D0=0x%lx\n", (unsigned long)reg[0]);
-      printf("D1=0x%lx\n", (unsigned long)reg[1]);
+      printf("PC=%lx D0=0x%lx D1=0x%lx D2=0x%lx D3=0x%lx\n",
+        (unsigned long)(w32)((void*)pc-(void*)memBase),
+        (unsigned long)reg[0],
+        (unsigned long)reg[1],
+        (unsigned long)reg[2],
+        (unsigned long)reg[3]);
       fflush(stdout);
   }
     //printf("ExecuteLoop: pc = %x\n", (w32)((void*)pc-(void*)memBase));
