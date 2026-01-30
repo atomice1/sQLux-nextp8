@@ -87,7 +87,7 @@ void WriteByte(aw32 addr,aw8 d)
 	Profiler_RecordDataWrite(addr);
 #endif
 
-	if (addr == 0x7ffffe || addr == 0x7fffff || addr == 0x800000 || addr < 32768) {
+	if (addr == 0x7ffffe || addr == 0x7fffff || addr < 32768) {
 		printf("\n*** Write to non-writable address 0x%x (value=0x%02x) ***\n", addr, d & 0xff);
 		DbgInfo();
 		exit(1);
@@ -121,8 +121,8 @@ void WriteWord(aw32 addr,aw16 d)
 	Profiler_RecordDataWrite(addr);
 #endif
 
-	if (addr == 0x7ffffe || addr == 0x7fffff || addr == 0x800000 || addr < 32768) {
-		printf("\n*** Write to noh-writable address 0x%x (value=0x%04x) ***\n", addr, d & 0xffff);
+	if (addr == 0x7ffffe || addr == 0x7fffff || addr < 32768) {
+		printf("\n*** Write to non-writable address 0x%x (value=0x%04x) ***\n", addr, d & 0xffff);
 		DbgInfo();
 		exit(1);
 	}
@@ -147,7 +147,7 @@ void WriteLong(aw32 addr,aw32 d)
 	Profiler_RecordDataWrite(addr);
 #endif
 
-	if (addr == 0x7ffffe || addr == 0x7fffff || addr == 0x800000 || addr < 32768) {
+	if (addr == 0x7ffffe || addr == 0x7fffff || addr < 32768) {
 		printf("\n*** Write to non-writable address 0x%x (value=0x%08x) ***\n", addr, d);
 		DbgInfo();
 		exit(1);
