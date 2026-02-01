@@ -3,6 +3,9 @@
  * 
  * Emulates a DS1307 RTC connected via I2C
  * Responds to I2C master transactions through MMIO registers
+ * 
+ * (C) 2026 Chris January
+ * GPL-3 with exception for sQLux linking
  */
 
 #include "i2c_rtc.h"

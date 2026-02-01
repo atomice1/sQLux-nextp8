@@ -376,6 +376,21 @@ int QLRun(void *data)
 	speed = (speed >= 0) && (sem50Hz != NULL) ? speed : 0;
 
 exec:
+#ifdef NEXTP8
+	extern void UART_TickAndReceive(int cycles);
+	UART_TickAndReceive(12);
+	extern void i2c_rtc_update(void);
+	i2c_rtc_update();
+	// Poll ESP8266 for network events every cycle
+	struct ESP8266_t;
+	typedef struct ESP8266_t ESP8266_t;
+	extern ESP8266_t *esp8266;
+	if (esp8266) {
+		extern void ESP8266_Poll(ESP8266_t *esp);
+		ESP8266_Poll(esp8266);
+	}
+#endif
+
 	if (!speed) {
 		ExecuteChunk(3000);
 	}

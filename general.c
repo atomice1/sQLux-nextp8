@@ -24,6 +24,7 @@
 #include "p8audio.h"
 #include "uart.h"
 #include "i2c_rtc.h"
+#include "esp8266_model.h"
 #endif
 
 #ifdef PROFILER
@@ -150,12 +151,16 @@ void (*PutToEA_l[8])(ashort, aw32) /*REGP2*/ = { PutToEA_l_m0, PutToEA_l_m1,
 #ifdef NEXTP8
 UART_t *uart = NULL;
 UART_t *uart2 = NULL;
+ESP8266_t *esp8266 = NULL;
+static uint8_t esp_data_latch = 0;
+static uint8_t esp_ctrl_prev = 0;
 
 void UART_TickAndReceive(int cycles)
 {
 	if (uart == NULL) {
 		uart = UART_Create();
 		uart2 = UART_Create();
+		esp8266 = ESP8266_Create();
 	}
 	if (cycles > 1) cycles *= UART_GetSpeed(uart);
 	for (int i=0;i<cycles;++i) {
@@ -327,6 +332,25 @@ void WriteHWByte(aw32 addr, aw8 d)
 		UART_SetDataIn(uart, d);
 		UART_TickAndReceive(12);
 		break;
+	case _ESP_CTRL:
+		// ESP8266 control register - detect write strobe rising edge
+		if (esp8266) {
+			// Check for rising edge of bit 0 (write strobe)
+			if ((d & 1) && !(esp_ctrl_prev & 1)) {
+				// Write strobe 0→1 transition - send latched data
+				ESP8266_ProcessUARTByte(esp8266, esp_data_latch);
+			}
+		}
+		esp_ctrl_prev = d;
+		break;
+	case _ESP_DATA:
+		// Latch data byte for ESP8266 UART
+		esp_data_latch = d;
+		break;
+	case _ESP_BAUD_DIV:
+		// Baud rate divisor for ESP8266 UART
+		// For now, we'll ignore this and use default baud rate
+		break;
 	case _I2C_DATA:
 		i2c_rtc_write_data(d);
 		break;
@@ -458,6 +482,33 @@ rw8 ReadHWByte(aw32 addr)
 		UART_TickAndReceive(1);
 		return ret;
 	}
+	case _ESP_CTRL: {
+		// ESP8266 control register - return ready flags
+		uint8_t ctrl = 0;
+		if (esp8266) {
+			// Bit 0: Data ready (data available to read)
+			if (ESP8266_TXDataAvailable(esp8266) > 0) {
+				ctrl |= 1;
+			}
+			// Bit 1: Ready (can accept write)
+			ctrl |= 2;  // Always ready for now
+		}
+		return ctrl;
+	}
+	case _ESP_DATA: {
+		// Read byte from ESP8266 UART
+		uint8_t ret = 0;
+		if (esp8266) {
+			int byte = ESP8266_GetUARTByte(esp8266);
+			if (byte >= 0) {
+				ret = (uint8_t)byte;
+			}
+		}
+		return ret;
+	}
+	case _ESP_BAUD_DIV:
+		// Return current baud divisor (default 115200)
+		return 0;
 	case _I2C_DATA:
 		return i2c_rtc_read_data();
 	case _I2C_STATUS:

@@ -104,9 +104,6 @@ void emu_loop() {
         init_done = 1;
     }
     if(init_done) {
-#ifdef NEXTP8
-        i2c_rtc_update();
-#endif
         QLSDLProcessEvents();
     }
 }

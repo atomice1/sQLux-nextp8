@@ -17,6 +17,9 @@
  *   0x08-0x3F: General purpose RAM (56 bytes)
  * 
  * I2C Address: 0x68 (7-bit)
+ *
+ * (C) 2026 Chris January
+ * GPL-3 with exception for sQLux linking
  */
 
 /**

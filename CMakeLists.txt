@@ -163,6 +163,8 @@ add_executable(
   src/GPUshaders.c
   Xscreen.c
   dummies.c
+  esp8266_model.c
+  esp8266_at_commands.c
   general.c
   i2c_rtc.c
   iexl_general.c
@@ -262,6 +264,11 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
   target_link_libraries(${SQLUX_EXECUTABLE_NAME} -Wl,-Bstatic -lpthread -lssp -Wl,-Bdynamic)
 endif()
 
+# Link against socket libraries for ESP8266 model
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+  target_link_libraries(${SQLUX_EXECUTABLE_NAME} -lm -lssl -lcrypto)
+endif()
+
 set_target_properties(${SQLUX_EXECUTABLE_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)
 
 if(LTO)
@@ -272,3 +279,13 @@ endif()
 unset(SUPPORT_SHADERS CACHE)
 
 install(TARGETS ${SQLUX_EXECUTABLE_NAME} DESTINATION ${CMAKE_INSTALL_PREFIX}/bin/)
+
+# ESP8266 Test Tool
+add_executable(esp8266_test 
+  esp8266_test.c
+  esp8266_model.c
+  esp8266_at_commands.c)
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+  target_link_libraries(esp8266_test -lssl -lcrypto)
+endif()
