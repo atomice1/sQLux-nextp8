@@ -112,7 +112,7 @@ struct emuOpts emuOptions[] = {
 #ifndef NEXTP8
 {"sysrom", "", "system rom", EMU_OPT_CHAR, 0, "MIN198.rom"},
 #endif
-{"win_size", "w", "window size 1x, 2x, 3x, max, full", EMU_OPT_CHAR, 0, "1x"},
+{"win_size", "w", "window size 1x, 2x, 3x, max, full", EMU_OPT_CHAR, 0, "3x"},
 {"verbose", "v", "verbosity level 0-3", EMU_OPT_INT, 1, NULL},
 {NULL},
 };
