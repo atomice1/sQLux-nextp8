@@ -620,7 +620,7 @@ static void emulatorUpdatePixelBufferQL(uint32_t *pixelPtr32,
 
 		*pixelPtr32++ = lo_colour;
 		*pixelPtr32++ = hi_colour;
-#else		
+#else
 		uint8_t t1 = *emulatorScreenPtr++;
 		uint8_t t2 = *emulatorScreenPtr++;
 
@@ -1002,7 +1002,7 @@ static struct SDLQLMap_f sdlqlmap_DE_ch[] = {
 	{ MOD_NONE, SDLK_MINUS, QL_MINUS }, // -
 	{ MOD_NONE, SDLK_KP_PLUS, (SWAP_SHIFT | QL_EQUAL) },
 	{ MOD_NONE, SDLK_KP_MULTIPLY, (SWAP_SHIFT | QL_8) },
-#endif	
+#endif
 	{ 0x0, 0x0, 0x0 }
 };
 
@@ -1105,46 +1105,139 @@ static struct SDLQLMap_f sdlqlmap_IT[] = {
 };
 
 #ifdef NEXTP8
-static struct SDLQLMap sdlqlmap_default[] = { { SDLK_LEFT, 235 },
-					      { SDLK_UP, 245 },
-					      { SDLK_RIGHT, 244 },
-					      { SDLK_DOWN, 242 },
+/* Complete PS/2 Scan Code Set 2 mapping
+ * Normal scancodes: use value directly
+ * Extended scancodes (E0 xx): use (0x80 | xx)
+ */
+static struct SDLQLMap sdlqlmap_default[] = {
+	// Function keys
+	{ SDLK_F1, 0x05 },
+	{ SDLK_F2, 0x06 },
+	{ SDLK_F3, 0x04 },
+	{ SDLK_F4, 0x0C },
+	{ SDLK_F5, 0x03 },
+	{ SDLK_F6, 0x0B },
+	{ SDLK_F7, 0x83 },
+	{ SDLK_F8, 0x0A },
+	{ SDLK_F9, 0x01 },
+	{ SDLK_F10, 0x09 },
+	{ SDLK_F11, 0x78 },
+	{ SDLK_F12, 0x07 },
 
-					      { SDLK_TAB, 13 },
+	// Number row
+	{ SDLK_BACKQUOTE, 0x0E },  // ` ~
+	{ SDLK_1, 0x16 },
+	{ SDLK_2, 0x1E },
+	{ SDLK_3, 0x26 },
+	{ SDLK_4, 0x25 },
+	{ SDLK_5, 0x2E },
+	{ SDLK_6, 0x36 },
+	{ SDLK_7, 0x3D },
+	{ SDLK_8, 0x3E },
+	{ SDLK_9, 0x46 },
+	{ SDLK_0, 0x45 },
+	{ SDLK_MINUS, 0x4E },
+	{ SDLK_EQUALS, 0x55 },
+	{ SDLK_BACKSPACE, 0x66 },
 
-						  { SDLK_LSHIFT, 18 },
+	// Top letter row
+	{ SDLK_TAB, 0x0D },
+	{ SDLK_q, 0x15 },
+	{ SDLK_w, 0x1D },
+	{ SDLK_e, 0x24 },
+	{ SDLK_r, 0x2D },
+	{ SDLK_t, 0x2C },
+	{ SDLK_y, 0x35 },
+	{ SDLK_u, 0x3C },
+	{ SDLK_i, 0x43 },
+	{ SDLK_o, 0x44 },
+	{ SDLK_p, 0x4D },
+	{ SDLK_LEFTBRACKET, 0x54 },   // [ {
+	{ SDLK_RIGHTBRACKET, 0x5B },  // ] }
+	{ SDLK_BACKSLASH, 0x5D },     // \ |
 
-					      { SDLK_a, 28 },
-					      { SDLK_b, 50 },
-					      { SDLK_c, 33 },
-					      { SDLK_d, 35 },
-					      { SDLK_e, 36 },
-					      { SDLK_f, 43 },
-					      { SDLK_g, 52 },
-					      { SDLK_h, 51 },
-					      { SDLK_i, 67 },
-					      { SDLK_j, 59 },
-					      { SDLK_k, 66 },
-					      { SDLK_l, 75 },
-					      { SDLK_m, 58 },
-					      { SDLK_n, 49 },
-					      { SDLK_o, 68 },
-					      { SDLK_p, 77 },
-					      { SDLK_q, 21 },
-					      { SDLK_r, 45 },
-					      { SDLK_s, 27 },
-					      { SDLK_t, 44 },
-					      { SDLK_u, 60 },
-					      { SDLK_v, 42 },
-					      { SDLK_w, 29 },
-					      { SDLK_x, 34 },
-					      { SDLK_y, 53 },
-					      { SDLK_z, 26 },
+	// Middle letter row
+	{ SDLK_CAPSLOCK, 0x58 },
+	{ SDLK_a, 0x1C },
+	{ SDLK_s, 0x1B },
+	{ SDLK_d, 0x23 },
+	{ SDLK_f, 0x2B },
+	{ SDLK_g, 0x34 },
+	{ SDLK_h, 0x33 },
+	{ SDLK_j, 0x3B },
+	{ SDLK_k, 0x42 },
+	{ SDLK_l, 0x4B },
+	{ SDLK_SEMICOLON, 0x4C },  // ; :
+	{ SDLK_QUOTE, 0x52 },      // ' "
+	{ SDLK_RETURN, 0x5A },
 
-						  { SDLK_RETURN, 0x5a },
-						  { SDLK_ESCAPE, 0x76 },
+	// Bottom letter row
+	{ SDLK_LSHIFT, 0x12 },
+	{ SDLK_z, 0x1A },
+	{ SDLK_x, 0x22 },
+	{ SDLK_c, 0x21 },
+	{ SDLK_v, 0x2A },
+	{ SDLK_b, 0x32 },
+	{ SDLK_n, 0x31 },
+	{ SDLK_m, 0x3A },
+	{ SDLK_COMMA, 0x41 },   // , <
+	{ SDLK_PERIOD, 0x49 },  // . >
+	{ SDLK_SLASH, 0x4A },   // / ?
+	{ SDLK_RSHIFT, 0x59 },
 
-					      { 0x0, 0x0 } };
+	// Bottom row
+	{ SDLK_LCTRL, 0x14 },
+	{ SDLK_LALT, 0x11 },
+	{ SDLK_SPACE, 0x29 },
+	{ SDLK_RALT, 0x91 },    // E0 11
+	{ SDLK_RCTRL, 0x94 },   // E0 14
+
+	// Editing keys (extended)
+	{ SDLK_INSERT, 0xF0 },     // E0 70
+	{ SDLK_DELETE, 0xF1 },     // E0 71
+	{ SDLK_HOME, 0xEC },       // E0 6C
+	{ SDLK_END, 0xE9 },        // E0 69
+	{ SDLK_PAGEUP, 0xFD },     // E0 7D
+	{ SDLK_PAGEDOWN, 0xFA },   // E0 7A
+
+	// Arrow keys (extended)
+	{ SDLK_UP, 0xF5 },      // E0 75
+	{ SDLK_DOWN, 0xF2 },    // E0 72
+	{ SDLK_LEFT, 0xEB },    // E0 6B
+	{ SDLK_RIGHT, 0xF4 },   // E0 74
+
+	// Keypad
+	{ SDLK_NUMLOCKCLEAR, 0x77 },
+	{ SDLK_KP_DIVIDE, 0xCA },     // E0 4A
+	{ SDLK_KP_MULTIPLY, 0x7C },
+	{ SDLK_KP_MINUS, 0x7B },
+	{ SDLK_KP_PLUS, 0x79 },
+	{ SDLK_KP_ENTER, 0xDA },      // E0 5A
+	{ SDLK_KP_PERIOD, 0x71 },
+	{ SDLK_KP_0, 0x70 },
+	{ SDLK_KP_1, 0x69 },
+	{ SDLK_KP_2, 0x72 },
+	{ SDLK_KP_3, 0x7A },
+	{ SDLK_KP_4, 0x6B },
+	{ SDLK_KP_5, 0x73 },
+	{ SDLK_KP_6, 0x74 },
+	{ SDLK_KP_7, 0x6C },
+	{ SDLK_KP_8, 0x75 },
+	{ SDLK_KP_9, 0x7D },
+
+	// Special keys
+	{ SDLK_ESCAPE, 0x76 },
+	{ SDLK_SCROLLLOCK, 0x7E },
+	{ SDLK_PAUSE, 0xE1 },  // Special: E1 14 77 E1 F0 14 F0 77
+	{ SDLK_PRINTSCREEN, 0xE0 },  // Special: E0 12 E0 7C
+
+	// Windows keys (extended)
+	{ SDLK_LGUI, 0x9F },    // E0 1F (left GUI/Windows)
+	{ SDLK_RGUI, 0xA7 },    // E0 27 (right GUI/Windows)
+	{ SDLK_APPLICATION, 0xAF },  // E0 2F (Application/Menu)
+
+	{ 0x0, 0x0 }
+};
 #else
 static struct SDLQLMap sdlqlmap_default[] = { { SDLK_LEFT, QL_LEFT },
 					      { SDLK_UP, QL_UP },
@@ -1238,6 +1331,7 @@ void QLSDProcessKey(SDL_Keysym *keysym, int pressed)
 	//	sdl_shiftstate, sdl_altstate, sdl_controlstate,
 	//	sdl_grfstate); fflush(stdout);
 
+#ifndef NEXTP8
 	/* Handle key pad entries that require shift - with the US keyboard */
 	if ((keysym->sym == SDLK_KP_MULTIPLY) && pressed && !sdlqlmap) {
 		queueKey(1 << 2, QL_8, 0);
@@ -1518,6 +1612,7 @@ void QLSDProcessKey(SDL_Keysym *keysym, int pressed)
 			}
 		}
 	}
+#endif
 	// Reset the search
 	i = 0;
 
