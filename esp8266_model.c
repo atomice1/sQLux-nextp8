@@ -240,6 +240,8 @@ static void ESP8266_TXQueueChar(ESP8266_t *esp, uint8_t byte) {
 
     // Drop if queue is full
     if (next_head == state->tx_tail) {
+        printf("[ESP] TX buffer overflow, dropping byte\n");
+        abort();
         return;
     }
 
