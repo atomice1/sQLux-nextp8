@@ -151,6 +151,8 @@ int main(int argc, char *argv[])
     }
 #endif
 
+    setvbuf(stdout, NULL, _IONBF, 0);
+
     // set the homedir for the OS first
     SetHome();
 
