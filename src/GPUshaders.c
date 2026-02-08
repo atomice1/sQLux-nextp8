@@ -7,6 +7,8 @@
 
 #ifdef ENABLE_SHADERS
 #include <string.h>
+#include <time.h>
+#include <sys/stat.h>
 #include <SDL_gpu.h>
 #include "SDL2screen.h"
 #include "QL_screen.h"
@@ -497,6 +499,65 @@ static void UpdateShader(float x, float y, float a, float b)
 	GPU_SetUniformfv(res_screen_size, 2, 1, fres);
 }
 
+/* Save screenshot to PNG file with unique filename */
+void QLGPUSaveScreenshot(void)
+{
+	if (!screen) {
+		fprintf(stderr, "Screenshot: screen not initialized\n");
+		return;
+	}
+
+	/* Generate filename with timestamp */
+	time_t now = time(NULL);
+	struct tm *t = localtime(&now);
+	char filename[256];
+	int counter = 0;
+
+	/* Find unique filename */
+	do {
+		if (counter == 0) {
+			snprintf(filename, sizeof(filename),
+				 "screenshot_%04d%02d%02d_%02d%02d%02d.png",
+				 t->tm_year + 1900, t->tm_mon + 1, t->tm_mday,
+				 t->tm_hour, t->tm_min, t->tm_sec);
+		} else {
+			snprintf(filename, sizeof(filename),
+				 "screenshot_%04d%02d%02d_%02d%02d%02d_%d.png",
+				 t->tm_year + 1900, t->tm_mon + 1, t->tm_mday,
+				 t->tm_hour, t->tm_min, t->tm_sec, counter);
+		}
+		counter++;
+
+		/* Check if file exists */
+		struct stat st;
+		if (stat(filename, &st) != 0) {
+			break;  /* File doesn't exist, use this name */
+		}
+	} while (counter < 1000);  /* Prevent infinite loop */
+
+	if (counter >= 1000) {
+		fprintf(stderr, "Screenshot: too many files with same timestamp\n");
+		return;
+	}
+
+	/* Capture screen to image */
+	GPU_Image* screenshot = GPU_CopyImageFromTarget(screen);
+	if (!screenshot) {
+		fprintf(stderr, "Screenshot: failed to capture screen\n");
+		return;
+	}
+
+	/* Save to PNG */
+	if (GPU_SaveImage(screenshot, filename, GPU_FILE_PNG)) {
+		printf("Screenshot saved: %s\n", filename);
+	} else {
+		fprintf(stderr, "Screenshot: failed to save %s\n", filename);
+	}
+
+	/* Clean up */
+	GPU_FreeImage(screenshot);
+}
+
 #else
 /*
    Empty functions, to allow linkage when ENABLE_SHADERS is not selected.
@@ -514,4 +575,5 @@ void QLGPUSetFullscreen(void) {}
 void QLGPUSetSize(int w, int h) {}
 void QLGPUProcessMouse(int* qlx, int* qly, int x, int y) {}
 void QLGPUClean(void) {}
+void QLGPUSaveScreenshot(void) {}
 #endif

@@ -266,7 +266,7 @@ endif()
 
 # Link against socket libraries for ESP8266 model
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-  target_link_libraries(${SQLUX_EXECUTABLE_NAME} -lm -lssl -lcrypto)
+  target_link_libraries(${SQLUX_EXECUTABLE_NAME} -lm -lssl -lcrypto -lSDL2_image)
 endif()
 
 set_target_properties(${SQLUX_EXECUTABLE_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)

@@ -16,6 +16,7 @@ void QLGPUSetFullscreen(void);
 void QLGPUSetSize(int w, int h);
 void QLGPUProcessMouse(int* qlx, int* qly, int x, int y);
 void QLGPUClean(void);
+void QLGPUSaveScreenshot(void);
 
 #endif
 

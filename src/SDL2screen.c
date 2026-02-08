@@ -8,7 +8,10 @@
 #include <inttypes.h>
 #include <math.h>
 #include <SDL.h>
+#include <SDL_image.h>
 #include <string.h>
+#include <time.h>
+#include <sys/stat.h>
 
 #include "debug.h"
 #include "emulator_options.h"
@@ -144,6 +147,7 @@ struct SDLQLMap_f {
 
 static struct SDLQLMap_f *sdlqlmap = NULL;
 static void setKeyboardLayout(void);
+static void SDL2SaveScreenshot(void);
 
 /* GIMP RGBA C-Source image dump (sQLuxLogo2.c) */
 
@@ -1323,6 +1327,78 @@ static struct SDLQLMap sdlqlmap_default[] = { { SDLK_LEFT, QL_LEFT },
 					      { 0x0, 0x0 } };
 #endif
 
+/* Save screenshot to PNG file with unique filename */
+static void SDL2SaveScreenshot(void)
+{
+	if (!ql_renderer || !ql_window) {
+		fprintf(stderr, "Screenshot: renderer not initialized\n");
+		return;
+	}
+
+	/* Generate filename with timestamp */
+	time_t now = time(NULL);
+	struct tm *t = localtime(&now);
+	char filename[256];
+	int counter = 0;
+
+	/* Find unique filename */
+	do {
+		if (counter == 0) {
+			snprintf(filename, sizeof(filename),
+				 "screenshot_%04d%02d%02d_%02d%02d%02d.png",
+				 t->tm_year + 1900, t->tm_mon + 1, t->tm_mday,
+				 t->tm_hour, t->tm_min, t->tm_sec);
+		} else {
+			snprintf(filename, sizeof(filename),
+				 "screenshot_%04d%02d%02d_%02d%02d%02d_%d.png",
+				 t->tm_year + 1900, t->tm_mon + 1, t->tm_mday,
+				 t->tm_hour, t->tm_min, t->tm_sec, counter);
+		}
+		counter++;
+
+		/* Check if file exists */
+		struct stat st;
+		if (stat(filename, &st) != 0) {
+			break;  /* File doesn't exist, use this name */
+		}
+	} while (counter < 1000);  /* Prevent infinite loop */
+
+	if (counter >= 1000) {
+		fprintf(stderr, "Screenshot: too many files with same timestamp\n");
+		return;
+	}
+
+	/* Get window surface dimensions */
+	int width, height;
+	SDL_GetWindowSize(ql_window, &width, &height);
+
+	/* Create a surface to hold the screenshot */
+	SDL_Surface *screenshot = SDL_CreateRGBSurface(0, width, height, 32,
+					0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+	if (!screenshot) {
+		fprintf(stderr, "Screenshot: failed to create surface: %s\n", SDL_GetError());
+		return;
+	}
+
+	/* Read pixels from renderer */
+	if (SDL_RenderReadPixels(ql_renderer, NULL, screenshot->format->format,
+				 screenshot->pixels, screenshot->pitch) != 0) {
+		fprintf(stderr, "Screenshot: failed to read pixels: %s\n", SDL_GetError());
+		SDL_FreeSurface(screenshot);
+		return;
+	}
+
+	/* Save to PNG */
+	if (IMG_SavePNG(screenshot, filename) == 0) {
+		printf("Screenshot saved: %s\n", filename);
+	} else {
+		fprintf(stderr, "Screenshot: failed to save %s: %s\n", filename, IMG_GetError());
+	}
+
+	/* Clean up */
+	SDL_FreeSurface(screenshot);
+}
+
 void QLSDProcessKey(SDL_Keysym *keysym, int pressed)
 {
 	int i = 0;
@@ -1434,10 +1510,6 @@ void QLSDProcessKey(SDL_Keysym *keysym, int pressed)
 		// else drop through
 	case SDLK_LALT:
 		sdl_altstate = pressed;
-		return;
-	case SDLK_F11:
-		if (pressed)
-			SDLQLFullScreen();
 		return;
 	}
 
@@ -1613,6 +1685,23 @@ void QLSDProcessKey(SDL_Keysym *keysym, int pressed)
 		}
 	}
 #endif
+
+	switch (keysym->sym) {
+	case SDLK_F6:
+		if (pressed) {
+			if (shaders_selected) {
+				QLGPUSaveScreenshot();
+			} else {
+				SDL2SaveScreenshot();
+			}
+		}
+		return;
+	case SDLK_F11:
+		if (pressed)
+			SDLQLFullScreen();
+		return;
+	}
+
 	// Reset the search
 	i = 0;
 
