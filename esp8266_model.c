@@ -248,7 +248,7 @@ static void ESP8266_TXQueueChar(ESP8266_t *esp, uint8_t byte) {
 }
 
 static void ESP8266_TXQueueString(ESP8266_t *esp, const char *str) {
-    //printf("[ESP] Queuing response: %s\n", str);
+    printf("[ESP] Queuing response: %s\n", str);
     for (const char *p = str; *p; p++) {
         ESP8266_TXQueueChar(esp, (uint8_t)*p);
     }
