@@ -41,8 +41,19 @@ extern bool shaders_selected;
 extern bool ql_fullscreen;
 extern double ql_screen_ratio;
 
+/* Keyboard row change function for testbench */
+void SDLQLKeyrowChg(int code, int press);
+
+/* FuncVal testbench functions */
+void QLSDLSaveFuncvalScreenshot(const char *filename);
+int QLSDLReadFramebufferPixel(int x, int y, uint16_t *pixel);
 
 #define USER_CODE_SCREENREFRESH     0
 #define USER_CODE_EMUEXIT           1
+
+#ifdef NEXTP8
+extern uint8_t joy_state[2];
+extern uint8_t joy_latched[2];
+#endif
 
 #endif

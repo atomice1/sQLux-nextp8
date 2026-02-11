@@ -25,6 +25,7 @@
 #include "uart.h"
 #include "i2c_rtc.h"
 #include "esp8266_model.h"
+#include "emulator_options.h"
 #endif
 
 #ifdef PROFILER
@@ -41,6 +42,7 @@ void debug(char *);
 void debug2(char *, long);
 
 extern void vmMarkScreen(uw32 /*addr*/);
+extern bool asyncTrace;
 
 #ifdef DEBUG
 int trace_rts = 0;
@@ -154,6 +156,8 @@ UART_t *uart2 = NULL;
 ESP8266_t *esp8266 = NULL;
 static uint8_t esp_data_latch = 0;
 static uint8_t esp_ctrl_prev = 0;
+static uint16_t debug_reg_hi = 0;
+static uint16_t debug_reg_lo = 0;
 
 void UART_TickAndReceive(int cycles)
 {
@@ -304,11 +308,16 @@ void WriteHWByte(aw32 addr, aw8 d)
 	switch (addr) {
 #ifdef NEXTP8
 	case _POST_CODE:
-		printf("POST: %d\n", d);
+		printf("POST: %u\n", d);
 		break;
 	case _VFRONTREQ:
 		//printf("VFRONTREQ: %d\n", d);
 		vfrontreq = d & 1;
+		break;
+	case _VBLANK_INTR_CTRL:
+		vblank_intr_enable = d & 1;
+		// Clear pending VBLANK interrupt
+		pendingInterrupt = 0; extraFlag = true;
 		break;
 	case _SDSPI_CHIP_SELECT:
 		SDSPI_SetChipSelect(d);
@@ -371,6 +380,15 @@ void WriteHWByte(aw32 addr, aw8 d)
 				printf("CPU disabled (exit on CPU disable is disabled)\n");
 			}
 		}
+		break;
+	case _MOUSE_BUTTONS_LATCHED:
+		sdl_mouse_buttons_latched &= ~d;
+		break;
+	case _JOYSTICK0_LATCHED:
+		joy_latched[0] &= ~d;
+		break;
+	case _JOYSTICK1_LATCHED:
+		joy_latched[1] &= ~d;
 		break;
 #else
 	case 0x018063: /* Display control */
@@ -446,10 +464,6 @@ void WriteHWByte(aw32 addr, aw8 d)
 			sdl_keyrow_latched[addr - _KEYBOARD_MATRIX_LATCHED] &= ~d;
 			return;
 		}
-		if (addr == _MOUSE_BUTTONS_LATCHED) {
-			sdl_mouse_buttons_latched &= ~d;
-			return;
-		}
 #endif
 		debug2("Write to HW register ", addr);
 		debug2("at (PC-2) ", (Ptr)pc - (Ptr)memBase - 2);
@@ -470,6 +484,14 @@ rw8 ReadHWByte(aw32 addr)
 
 	switch (addr) {
 #ifdef NEXTP8
+	case _HW_VERSION_HI:
+		return 0x00;  /* API_VERSION */
+	case _HW_VERSION_HI + 1:
+		return 0x00;  /* MAJOR_VERSION */
+	case _HW_VERSION_LO:
+		return 0x01;  /* MINOR_VERSION */
+	case _HW_VERSION_LO + 1:
+		return patch_version;  /* PATCH_VERSION */
 	case _VFRONT:
 		//printf("VFRONT: %d\n", vfront);
 		return vfront;
@@ -522,6 +544,14 @@ rw8 ReadHWByte(aw32 addr)
 		return i2c_rtc_read_status();
 	case _OVERLAY_CONTROL:
 		return overlay_control;
+	case _JOYSTICK0:
+		return joy_state[0];
+	case _JOYSTICK1:
+		return joy_state[1];
+	case _JOYSTICK0_LATCHED:
+		return joy_latched[0];
+	case _JOYSTICK1_LATCHED:
+		return joy_latched[1];
 #else
 	case 0x018000: /* Read from real-time clock */
 	case 0x018001:
@@ -591,7 +621,9 @@ rw8 ReadHWByte(aw32 addr)
 			return sdl_mouse_buttons;
 		}
 		if (addr == _MOUSE_BUTTONS_LATCHED) {
-			return sdl_mouse_buttons_latched;
+			uint8_t value = sdl_mouse_buttons_latched;
+			sdl_mouse_buttons_latched = 0;
+			return value;
 		}
 		if (addr >= _DA_MEMORY_BASE && addr < _DA_MEMORY_BASE + _DA_MEMORY_SIZE) {
 			if ((addr & 1) == 0)
@@ -672,6 +704,10 @@ rw16 ReadHWWord(aw32 addr)
 		return (uint16_t)sdl_mouse_y_accum;
 	case _MOUSE_Z:
 		return (uint16_t)sdl_mouse_z_accum;
+	case 0x80000a: /* _DEBUG_REG_HI */
+		return debug_reg_hi;
+	case 0x80000c: /* _DEBUG_REG_LO */
+		return debug_reg_lo;
 #else
 	case 0x018108:
 		return SQLUXBDISizeHigh();
@@ -748,6 +784,12 @@ void WriteHWWord(aw32 addr, aw16 d)
 		UART_SetSpeed(uart, d);
 		UART_SetSpeed(uart2, d);
 		UART_TickAndReceive(1);
+		break;
+	case _DEBUG_REG_HI:
+		debug_reg_hi = d;
+		break;
+	case _DEBUG_REG_LO:
+		debug_reg_lo = d;
 		break;
 #else
 	case 0x018104:

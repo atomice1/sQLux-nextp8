@@ -190,6 +190,12 @@ int main(int argc, char *argv[])
             fprintf(stderr, "Exit on CPU disable disabled (from command line)\n");
         }
     }
+
+    // Enable asyncTrace if requested
+    if (emulatorOptionFlag("asynctrace")) {
+        asyncTrace = true;
+        fprintf(stderr, "AsyncTrace enabled at startup\n");
+    }
 #endif
 
     // setup the boot_cmd if needed

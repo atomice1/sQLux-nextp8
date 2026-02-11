@@ -12,9 +12,26 @@
 #include "unixstuff.h"
 #include <unistd.h>
 
+#ifdef NEXTP8
+#include "funcval_testbench.h"
+#include "emulator_options.h"
+#endif
+
 #ifdef PROFILER
 #include "profiler/profiler_events.h"
 #endif
+
+extern bool asyncTrace;
+
+static void log_mem_wr_long(aw32 addr, aw32 d)
+{
+	if (!asyncTrace)
+		return;
+
+	// 68000 is big-endian: high word at addr, low word at addr+2
+	printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(d >> 16) & 0xffff);
+	printf("MEM WR: addr=0x%x data=0x%x\n", addr + 2, (unsigned)d & 0xffff);
+}
 
 static int is_hw(uint32_t addr)
 {
@@ -30,53 +47,136 @@ static int is_hw(uint32_t addr)
 
 rw8 ReadByte(aw32 addr)
 {
+	rw8 result;
 	addr &= ADDR_MASK;
 
 #ifdef PROFILER
 	Profiler_RecordDataRead(addr);
 #endif
 
-	if (is_hw(addr))
-		return ReadHWByte(addr);
+#ifdef NEXTP8
+	/* Check for FuncVal testbench access (3MB-4MB range) */
+	if (funcval_mode && funcval_is_testbench_addr(addr)) {
+		result = funcval_read_byte(addr);
+		if (asyncTrace) {
+			if (addr & 1)
+				printf("MEM RD: addr=0x%x data=0xzz%02x\n", addr, (unsigned)result & 0xff);
+			else
+				printf("MEM RD: addr=0x%x data=0x%02xzz\n", addr, (unsigned)result & 0xff);
+		}
+		return result;
+	}
+#endif
 
-	if ((addr >= RTOP) && (addr >=qlscreen.qm_hi))
-		return 0;
+	if (is_hw(addr)) {
+		result = ReadHWByte(addr);
+		if (asyncTrace) {
+			printf("MEM RD: addr=0x%x data=0x%x\n", addr, (unsigned)(((result << 8) | result)) & 0xffff);
+		}
+		return result;
+	}
 
-	return *((w8 *)memBase + addr);
+	if ((addr >= RTOP) && (addr >=qlscreen.qm_hi)) {
+		result = 0;
+		if (asyncTrace) {
+			if (addr & 1)
+				printf("MEM RD: addr=0x%x data=0xzz%02x\n", addr, (unsigned)result & 0xff);
+			else
+				printf("MEM RD: addr=0x%x data=0x%02xzz\n", addr, (unsigned)result & 0xff);
+		}
+		return result;
+	}
+
+	result = *((w8 *)memBase + addr);
+	if (asyncTrace) {
+		if (addr & 1)
+			printf("MEM RD: addr=0x%x data=0xzz%02x\n", addr, (unsigned)result & 0xff);
+		else
+			printf("MEM RD: addr=0x%x data=0x%02xzz\n", addr, (unsigned)result & 0xff);
+	}
+	return result;
 }
 
 rw16 ReadWord(aw32 addr)
 {
+	rw16 result;
 	addr &= ADDR_MASK;
 
 #ifdef PROFILER
 	Profiler_RecordDataRead(addr);
 #endif
 
-	if (is_hw(addr))
-		return ((w16)ReadHWWord(addr));
+#ifdef NEXTP8
+	/* Check for FuncVal testbench access (3MB-4MB range) */
+	if (funcval_mode && funcval_is_testbench_addr(addr)) {
+		result = funcval_read_word(addr);
+		if (asyncTrace) printf("MEM RD: addr=0x%x data=0x%x\n", addr, (unsigned)result & 0xffff);
+		return result;
+	}
+#endif
 
-	if ((addr >= RTOP) && (addr >=qlscreen.qm_hi))
-		return 0;
+	if (is_hw(addr)) {
+		result = (w16)ReadHWWord(addr);
+		if (asyncTrace) printf("MEM RD: addr=0x%x data=0x%x\n", addr, (unsigned)result & 0xffff);
+		return result;
+	}
 
-	return (w16)RW((w16 *)((Ptr)memBase + addr)); /* make sure it is signed */
+	if ((addr >= RTOP) && (addr >=qlscreen.qm_hi)) {
+		result = 0;
+		if (asyncTrace) printf("MEM RD: addr=0x%x data=0x%x\n", addr, (unsigned)result & 0xffff);
+		return result;
+	}
+
+	result = (w16)RW((w16 *)((Ptr)memBase + addr)); /* make sure it is signed */
+	if (asyncTrace) printf("MEM RD: addr=0x%x data=0x%x\n", addr, (unsigned)result & 0xffff);
+	return result;
 }
 
 rw32 ReadLong(aw32 addr)
 {
+	rw32 result;
 	addr &= ADDR_MASK;
 
 #ifdef PROFILER
 	Profiler_RecordDataRead(addr);
 #endif
 
-	if (is_hw(addr))
-		return ((w32)ReadHWLong(addr));
+#ifdef NEXTP8
+	/* Check for FuncVal testbench access (3MB-4MB range) */
+	if (funcval_mode && funcval_is_testbench_addr(addr)) {
+		result = funcval_read_long(addr);
+		if (asyncTrace) {
+			printf("MEM RD: addr=0x%x data=0x%x\n", addr, (unsigned)(result >> 16) & 0xffff);
+			printf("MEM RD: addr=0x%x data=0x%x\n", addr + 2, (unsigned)result & 0xffff);
+		}
+		return result;
+	}
+#endif
 
-	if ((addr >= RTOP) && (addr >=qlscreen.qm_hi))
-		return 0;
+	if (is_hw(addr)) {
+		result = (w32)ReadHWLong(addr);
+		if (asyncTrace) {
+			printf("MEM RD: addr=0x%x data=0x%x\n", addr, (unsigned)(result >> 16) & 0xffff);
+			printf("MEM RD: addr=0x%x data=0x%x\n", addr + 2, (unsigned)result & 0xffff);
+		}
+		return result;
+	}
 
-	return (w32)RL((Ptr)memBase + addr); /* make sure is is signed */
+	if ((addr >= RTOP) && (addr >=qlscreen.qm_hi)) {
+		result = 0;
+		if (asyncTrace) {
+			printf("MEM RD: addr=0x%x data=0x%x\n", addr, (unsigned)(result >> 16) & 0xffff);
+			printf("MEM RD: addr=0x%x data=0x%x\n", addr + 2, (unsigned)result & 0xffff);
+		}
+		return result;
+	}
+
+	result = (w32)RL((Ptr)memBase + addr); /* make sure is is signed */
+	if (asyncTrace) {
+		printf("MEM RD: addr=0x%x data=0x%x\n", addr, (unsigned)(result >> 16) & 0xffff);
+		printf("MEM RD: addr=0x%x data=0x%x\n", addr + 2, (unsigned)result & 0xffff);
+	}
+	return result;
 }
 
 void WriteByte(aw32 addr,aw8 d)
@@ -95,22 +195,36 @@ void WriteByte(aw32 addr,aw8 d)
 
 	if (addr == 0xfffffe) {
 		write(1, &d, 1);
+		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((d << 8) | d)) & 0xffff);
 		return;
 	} else if (addr == 0xffffff) {
 		write(2, &d, 1);
+		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((d << 8) | d)) & 0xffff);
 		return;
 	}
 
+#ifdef NEXTP8
+	/* Check for FuncVal testbench access (3MB-4MB range) */
+	if (funcval_mode && funcval_is_testbench_addr(addr)) {
+		funcval_write_byte(addr, d);
+		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((d << 8) | d)) & 0xffff);
+		return;
+	}
+#endif
+
 	if (is_hw(addr)) {
 		WriteHWByte(addr, d);
+		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((d << 8) | d)) & 0xffff);
 		return;
 	}
 
 	if ((addr >= RTOP) && (addr >= qlscreen.qm_hi))
 		return;
 
-	if (addr >= QL_SCREEN_BASE)
+	if (addr >= QL_SCREEN_BASE) {
 		*((w8 *)memBase + addr) = d;
+		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((d << 8) | d)) & 0xffff);
+	}
 }
 
 void WriteWord(aw32 addr,aw16 d)
@@ -127,16 +241,28 @@ void WriteWord(aw32 addr,aw16 d)
 		exit(1);
 	}
 
+#ifdef NEXTP8
+	/* Check for FuncVal testbench access (3MB-4MB range) */
+	if (funcval_mode && funcval_is_testbench_addr(addr)) {
+		funcval_write_word(addr, d);
+		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)d & 0xffff);
+		return;
+	}
+#endif
+
 	if (is_hw(addr)) {
 		WriteHWWord(addr, d);
+		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)d & 0xffff);
 		return;
 	}
 
 	if ((addr >= RTOP) && (addr >= qlscreen.qm_hi))
 		return;
 
-	if (addr >= QL_SCREEN_BASE)
+	if (addr >= QL_SCREEN_BASE) {
 		WW((Ptr)memBase + addr, d);
+		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)d & 0xffff);
+	}
 }
 
 void WriteLong(aw32 addr,aw32 d)
@@ -153,9 +279,19 @@ void WriteLong(aw32 addr,aw32 d)
 		exit(1);
 	}
 
+#ifdef NEXTP8
+	/* Check for FuncVal testbench access (3MB-4MB range) */
+	if (funcval_mode && funcval_is_testbench_addr(addr)) {
+		funcval_write_long(addr, d);
+		log_mem_wr_long(addr, d);
+		return;
+	}
+#endif
+
 	if (is_hw(addr)) {
 		WriteHWWord(addr, d >> 16);
 		WriteHWWord(addr + 2, d);
+		log_mem_wr_long(addr, d);
 		return;
 	}
 
@@ -164,6 +300,7 @@ void WriteLong(aw32 addr,aw32 d)
 
 	if (addr >= QL_SCREEN_BASE) {
 		WL((Ptr)memBase + addr, d);
+		log_mem_wr_long(addr, d);
 	}
 }
 

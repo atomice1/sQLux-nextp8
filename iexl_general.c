@@ -530,23 +530,47 @@ rw32 AREGP GetEA_mBad(ashort r)
   return 0;
 }
 
+static char buf1[32], buf2[32], buf3[32], buf4[32], buf5[32], buf6[32], buf7[32], buf8[32], buf9[32];
+static char buf10[32], buf11[32], buf12[32], buf13[32], buf14[32], buf15[32], buf16[32], buf17[32];
+
+static const char *change_to_str(char *buf, uint32_t old_val, uint32_t new_val) {
+    if (old_val == new_val) {
+        snprintf(buf, 32, "0x%x", new_val);
+    } else {
+        snprintf(buf, 32, "0x%x->0x%x", old_val, new_val);
+    }
+    return buf;
+}
+
 void ExecuteLoop(void)  /* fetch and dispatch loop */
 {
   while(--nInst>=0)
     {
-
+      const bool trace = asyncTrace;
 #ifdef TRACE
       if (pc>tracelo) DoTrace();
 #endif
-  if (asyncTrace) {
-      printf("PC=%lx D0=0x%lx D1=0x%lx D2=0x%lx D3=0x%lx\n",
-        (unsigned long)(w32)((void*)pc-(void*)memBase),
-        (unsigned long)reg[0],
-        (unsigned long)reg[1],
-        (unsigned long)reg[2],
-        (unsigned long)reg[3]);
-      fflush(stdout);
-  }
+    uint32_t old_pc, old_d0, old_d1, old_d2, old_d3, old_d4, old_d5, old_d6, old_d7;
+    uint32_t old_a0, old_a1, old_a2, old_a3, old_a4, old_a5, old_a6, old_a7;
+    if (trace) {
+        old_pc = (void*)pc-(void*)memBase;
+        old_d0 = reg[0];
+        old_d1 = reg[1];
+        old_d2 = reg[2];
+        old_d3 = reg[3];
+        old_d4 = reg[4];
+        old_d5 = reg[5];
+        old_d6 = reg[6];
+        old_d7 = reg[7];
+        old_a0 = reg[8];
+        old_a1 = reg[9];
+        old_a2 = reg[10];
+        old_a3 = reg[11];
+        old_a4 = reg[12];
+        old_a5 = reg[13];
+        old_a6 = reg[14];
+        old_a7 = reg[15];
+    }
     //printf("ExecuteLoop: pc = %x\n", (w32)((void*)pc-(void*)memBase));
     /*if ((w32)((void*)pc-(void*)memBase) >= 0x40000 ) {
       printf("ExecuteLoop: pc = %x\n", (w32)((void*)pc-(void*)memBase));
@@ -561,6 +585,29 @@ void ExecuteLoop(void)  /* fetch and dispatch loop */
       Profiler_RecordInstructionExecute((w32)((void*)pc-(void*)memBase));
 #endif
       qlux_table[code=RW_PC(pc++)&0xffff]();
+
+      if (trace) {
+        uint32_t new_pc = (char*)pc-(char*)memBase;
+        printf("PC=%s D0=%s D1=%s D2=%s D3=%s D4=%s D5=%s D6=%s D7=%s A0=%s A1=%s A2=%s A3=%s A4=%s A5=%s A6=%s A7=%s\n",
+               change_to_str(buf1, old_pc, new_pc),
+               change_to_str(buf2, old_d0, reg[0]),
+               change_to_str(buf3, old_d1, reg[1]),
+               change_to_str(buf4, old_d2, reg[2]),
+               change_to_str(buf5, old_d3, reg[3]),
+               change_to_str(buf6, old_d4, reg[4]),
+               change_to_str(buf7, old_d5, reg[5]),
+               change_to_str(buf8, old_d6, reg[6]),
+               change_to_str(buf9, old_d7, reg[7]),
+               change_to_str(buf10, old_a0, reg[8]),
+               change_to_str(buf11, old_a1, reg[9]),
+               change_to_str(buf12, old_a2, reg[10]),
+               change_to_str(buf13, old_a3, reg[11]),
+               change_to_str(buf14, old_a4, reg[12]),
+               change_to_str(buf15, old_a5, reg[13]),
+               change_to_str(buf16, old_a6, reg[14]),
+               change_to_str(buf17, old_a7, reg[15]));
+        fflush(stdout);
+      }
     }
 
   if (SDL_AtomicGet(&doPoll)) dosignal();

@@ -23,6 +23,7 @@
 #include "QL_screen.h"
 #include "unixstuff.h"
 #include "QL_sound.h"
+#include "funcval_testbench.h"
 
 #define SWAP_SHIFT 0x100
 #define SWAP_CNTRL 0x200
@@ -352,6 +353,11 @@ int joy_char[2][5] = { { 49, 52, 50, 55, 54 }, // left, right, up, down, fire
 static joy_data joy[2] = { { NULL, -1, 0, 1 }, { NULL, -1, 0, 1 } };
 #endif
 
+#ifdef NEXTP8
+uint8_t joy_state[2] = { 0, 0 };
+uint8_t joy_latched[2] = { 0, 0 };
+#endif
+
 static bool QLSDLCreateDisplay(int w, int h, int ly, uint32_t *id,
 			       const char *name, uint32_t sdl_window_mode);
 static void QLSDLUpdateScreen();
@@ -428,7 +434,11 @@ void QLSDLScreen(void)
 		sdl_window_mode = SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
 
 		win_size = emulatorOptionString("win_size");
-		if (!strcmp("2x", win_size)) {
+		if (funcval_mode) {
+			/* Force 6x scale in funcval mode */
+			w = qlscreen.xres * 6;
+			h = lrint(ay * 6.0);
+		} else if (!strcmp("2x", win_size)) {
 			w = qlscreen.xres * 2;
 			h = lrint(ay * 2.0);
 		} else if (!strcmp("3x", win_size)) {
@@ -707,12 +717,17 @@ static void QLSDLUpdatePixelBuffer()
 				    emulatorScreenPtrEnd);
 
 #ifdef NEXTP8
-	/*if (vfront != vfrontreq) {
-		printf("flip: vfrontreq=%d vfront=%d->%d\n", vfrontreq, vfront, vfrontreq);
-		fflush(stdout);
+	static bool debug_next;
+	if (vfront != vfrontreq || debug_next) {
+		printf("VFRONT: %d VFRONTREQ: %d\n", vfront, vfrontreq);
+		debug_next = vfront != vfrontreq;
 	}
-	*/
 	vfront = vfrontreq;
+	/* Trigger VBLANK interrupt if enabled */
+	if (vblank_intr_enable) {
+		pendingInterrupt = 2;  /* Level 2 interrupt */
+		extraFlag = true;
+	}
 #endif
 
 	if (SDL_MUSTLOCK(ql_screen)) {
@@ -724,7 +739,6 @@ static void QLSDLUpdatePixelBuffer()
 void QLSDLWritePixels(uint32_t *pixelPtr32)
 {
 #ifdef NEXTP8
-	//printf("QLSDLWritePixels: vfront = %d\n", vfront);
 	uint8_t *emulatorScreenPtr = (uint8_t *)&frameBuffer[vfront];
 #else
 	uint8_t *emulatorScreenPtr = (uint8_t *)memBase + qlscreen.qm_lo;
@@ -735,11 +749,17 @@ void QLSDLWritePixels(uint32_t *pixelPtr32)
 				    emulatorScreenPtrEnd);
 
 #ifdef NEXTP8
-	if (vfront != vfrontreq) {
-		printf("flip: vfrontreq=%d vfront=%d->%d\n", vfrontreq, vfront, vfrontreq);
-		fflush(stdout);
+	static bool debug_next;
+	if (vfront != vfrontreq || debug_next) {
+		printf("VFRONT: %d VFRONTREQ: %d\n", vfront, vfrontreq);
+		debug_next = vfront != vfrontreq;
 	}
 	vfront = vfrontreq;
+	/* Trigger VBLANK interrupt if enabled */
+	if (vblank_intr_enable) {
+		pendingInterrupt = 2;  /* Level 2 interrupt */
+		extraFlag = true;
+	}
 #endif
 }
 
@@ -866,7 +886,7 @@ unsigned int sdl_mouse_buttons = 0;
 unsigned int sdl_mouse_buttons_latched = 0;
 #endif
 
-static void SDLQLKeyrowChg(int code, int press)
+void SDLQLKeyrowChg(int code, int press)
 {
 	code &= 0xff; // Make sure that array bounds are not exceeded
 #ifdef NEXTP8
@@ -1399,6 +1419,123 @@ static void SDL2SaveScreenshot(void)
 	SDL_FreeSurface(screenshot);
 }
 
+/* FuncVal testbench screenshot - saves to specific filename */
+void QLSDLSaveFuncvalScreenshot(const char *filename)
+{
+#ifdef NEXTP8
+	/* Get native framebuffer data */
+	uint8_t *emulatorScreenPtr = (uint8_t *)&frameBuffer[vfront];
+	uint8_t *emulatorScreenPtrEnd = emulatorScreenPtr + qlscreen.qm_len;
+
+	/* Create native resolution pixel buffer (128x128) */
+	const int native_width = 128;
+	const int native_height = 128;
+	uint32_t *native_pixels = malloc(native_width * native_height * sizeof(uint32_t));
+	if (!native_pixels) {
+		fprintf(stderr, "FuncVal screenshot: failed to allocate native buffer\n");
+		return;
+	}
+
+	/* Convert framebuffer to 32-bit RGBA pixels */
+	emulatorUpdatePixelBufferQL(native_pixels, emulatorScreenPtr, emulatorScreenPtrEnd);
+
+	/* Scale up 6x to 768x768 */
+	const int scale = 6;
+	const int output_width = native_width * scale;
+	const int output_height = native_height * scale;
+
+	/* Save to PPM (P3 ASCII format) */
+	FILE *f = fopen(filename, "w");
+	if (!f) {
+		fprintf(stderr, "FuncVal screenshot: failed to open %s\n", filename);
+		free(native_pixels);
+		return;
+	}
+
+	/* Write PPM header */
+	fprintf(f, "P3\n%d %d\n255\n", output_width, output_height);
+
+	/* Write pixel data scaled 6x6 */
+	for (int y = 0; y < output_height; y++) {
+		int native_y = y / scale;
+		for (int x = 0; x < output_width; x++) {
+			int native_x = x / scale;
+			uint32_t rgba = native_pixels[native_y * native_width + native_x];
+
+			/* Extract BGR from RGBA8888 (stored as BGRA in memory) and swap to RGB for PPM */
+			uint8_t b = (rgba >> 16) & 0xFF;
+			uint8_t g = (rgba >> 8) & 0xFF;
+			uint8_t r = rgba & 0xFF;
+
+			fprintf(f, "%d %d %d ", r, g, b);
+		}
+		fprintf(f, "\n");
+	}
+
+	fclose(f);
+	free(native_pixels);
+	printf("Screenshot saved: %s\n", filename);
+#endif
+}
+
+/* Read a pixel from the framebuffer for FuncVal testbench VGA readback */
+/* Returns pixel in 0RGB format (12-bit RGB) */
+int QLSDLReadFramebufferPixel(int x, int y, uint16_t *pixel)
+{
+#ifdef NEXTP8
+	printf("Read framebuffer pixel at (%d, %d)\n", x, y);
+
+	/* Get native framebuffer data */
+	uint8_t *emulatorScreenPtr = (uint8_t *)&frameBuffer[vfront];
+	uint8_t *emulatorScreenPtrEnd = emulatorScreenPtr + qlscreen.qm_len;
+
+	/* Create native resolution pixel buffer (128x128) */
+	const int native_width = 128;
+	const int native_height = 128;
+	const int scale = 6;
+
+	/* Scale down coordinates to native resolution */
+	int native_x = (x - 130) / scale;
+	int native_y = y / scale;
+
+	/* Check bounds */
+	if (native_x < 0 || native_x >= native_width || native_y < 0 || native_y >= native_height) {
+		*pixel = 0;
+		return -1;
+	}
+
+	/* Allocate buffer for native pixels */
+	uint32_t *native_pixels = malloc(native_width * native_height * sizeof(uint32_t));
+	if (!native_pixels) {
+		*pixel = 0;
+		return -1;
+	}
+
+	/* Convert framebuffer to 32-bit RGBA pixels */
+	emulatorUpdatePixelBufferQL(native_pixels, emulatorScreenPtr, emulatorScreenPtrEnd);
+
+	/* Get pixel at native coordinates */
+	uint32_t rgba = native_pixels[native_y * native_width + native_x];
+
+	/* Convert from RGBA8888 to 0RGB (12-bit) */
+	uint8_t b = (rgba >> 16) & 0xFF;
+	uint8_t g = (rgba >> 8) & 0xFF;
+	uint8_t r = rgba & 0xFF;
+
+	/* Convert 8-bit to 4-bit per channel */
+	r = r >> 4;
+	g = g >> 4;
+	b = b >> 4;
+		/* Pack as 0RGB */
+	*pixel = ((r & 0xF) << 8) | ((g & 0xF) << 4) | (b & 0xF);
+
+	printf("Read pixel RGBA: %08x -> 0RGB: %03X\n", rgba, *pixel);
+
+	free(native_pixels);
+	return 0;
+#endif
+}
+
 void QLSDProcessKey(SDL_Keysym *keysym, int pressed)
 {
 	int i = 0;
@@ -1844,16 +1981,46 @@ static void QLProcessJoystickAxis(Sint32 which, Uint8 axis, Sint16 value)
 
 		if (offset != -1) {
 			if (value < -10000) {
+#ifdef NEXTP8
+				if (offset == 2) {
+					joy_state[index] = (joy_state[index] & ~0x03) | 0x01; // Up
+					joy_latched[index] = (joy_latched[index] & ~0x03) | 0x01;
+				} else {
+					joy_state[index] = (joy_state[index] & ~0x0c) | 0x04; // Left
+					joy_latched[index] = (joy_latched[index] & ~0x0c) | 0x04;
+				}
+#else
 				queueKey(0, joy_char[index][offset], 0);
 				SDLQLKeyrowChg(joy_char[index][offset], 1);
 				SDLQLKeyrowChg(joy_char[index][offset + 1], 0);
+#endif
 			} else if (value > 10000) {
+#ifdef NEXTP8
+				if (offset == 2) {
+					joy_state[index] = (joy_state[index] & ~0x03) | 0x02; // Down
+					joy_latched[index] = (joy_latched[index] & ~0x03) | 0x02;
+				} else {
+					joy_state[index] = (joy_state[index] & ~0x0c) | 0x08; // Right
+					joy_latched[index] = (joy_latched[index] & ~0x0c) | 0x08;
+				}
+#else
 				queueKey(0, joy_char[index][offset + 1], 0);
 				SDLQLKeyrowChg(joy_char[index][offset + 1], 1);
 				SDLQLKeyrowChg(joy_char[index][offset], 0);
+#endif
 			} else {
+#ifdef NEXTP8
+				if (offset == 2) {
+					joy_state[index] = (joy_state[index] & ~0x03); // Center vertical
+					joy_latched[index] = (joy_latched[index] & ~0x03);
+				} else {
+					joy_state[index] = (joy_state[index] & ~0x0c); // Center horizontal
+					joy_latched[index] = (joy_latched[index] & ~0x0c);
+				}
+#else
 				SDLQLKeyrowChg(joy_char[index][offset], 0);
 				SDLQLKeyrowChg(joy_char[index][offset + 1], 0);
+#endif
 			}
 		}
 	}
@@ -1864,10 +2031,15 @@ static void QLProcessJoystickButton(Sint32 which, Sint16 button, Sint16 pressed)
 	int index = QLConvertWhichToIndex(which);
 
 	if (index > -1) {
+#ifdef NEXTP8
+		joy_state[index] = (joy_state[index] & ~(1 << (4 + button))) | ((pressed ? 1 : 0) << (4 + button));
+		joy_latched[index] = (joy_latched[index] & ~(1 << (4 + button))) | ((pressed ? 1 : 0) << (4 + button));
+#else
 		// Allow any button to represent fire
 		if (pressed)
 			queueKey(0, joy_char[index][4], 0);
 		SDLQLKeyrowChg(joy_char[index][4], pressed);
+#endif
 	}
 }
 

@@ -22,6 +22,7 @@ uint8_t overlayBuffer[2][8192];
 uint8_t screenPalette[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 int vfront = 0, vfrontreq = 0;
 uint8_t overlay_control = 0;  // [3:0] transparent index, [6] enable
+uint8_t vblank_intr_enable = 0;  // VBLANK interrupt enable (bit 0)
 #endif
 
 struct SCREENDEF

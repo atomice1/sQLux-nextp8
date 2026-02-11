@@ -166,6 +166,7 @@ add_executable(
   esp8266_model.c
   esp8266_at_commands.c
   general.c
+  funcval_testbench.c
   i2c_rtc.c
   iexl_general.c
   instructions_ao.c
@@ -202,7 +203,9 @@ add_executable(
 set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/version.c
   PROPERTIES GENERATED TRUE)
 set_source_files_properties(p8_audio.c
-    PROPERTIES COMPILE_FLAGS "-UNEXTP8 -DSDL -DENABLE_AUDIO")
+    PROPERTIES COMPILE_FLAGS "-UNEXTP8 -DSDL -DENABLE_AUDIO -DSDL_OpenAudio=SDL_OpenAudio_shim")
+set_source_files_properties(QL_sound.c
+    PROPERTIES COMPILE_FLAGS "-DSDL_OpenAudioDevice=SDL_OpenAudioDevice_shim")
 
 add_dependencies(${SQLUX_EXECUTABLE_NAME} SubmarineGitVersion)
 
@@ -266,7 +269,7 @@ endif()
 
 # Link against socket libraries for ESP8266 model
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-  target_link_libraries(${SQLUX_EXECUTABLE_NAME} -lm -lssl -lcrypto -lSDL2_image)
+  target_link_libraries(${SQLUX_EXECUTABLE_NAME} -lm -lssl -lcrypto -lSDL2_image -ldl)
 endif()
 
 set_target_properties(${SQLUX_EXECUTABLE_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)

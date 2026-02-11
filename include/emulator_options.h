@@ -3,8 +3,15 @@
 #ifndef EMULATOR_OPTIONS_H
 #define EMULATOR_OPTIONS_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifdef NEXTP8
+extern int funcval_mode;
+extern uint8_t patch_version;
 #endif
 
 int emulatorOptionParse(int argc, char **argv);

@@ -51,6 +51,7 @@ struct emuOpts {
 struct emuOpts emuOptions[] = {
 #ifdef NEXTP8
 {"app_args", "", "command line arguments to pass to the application", EMU_OPT_CHAR, 0, NULL},
+{"asynctrace", "", "enable async trace output at startup", EMU_OPT_FLAG, 0, NULL},
 {"check_calling_convention", "", "check M68000 calling convention (preserve a2-a7, d2-d7)", EMU_OPT_FLAG, 0, NULL},
 {"exit_on_cpu_disable", "", "exit emulator when CPU is disabled (RESET_REQ = 0xff), default 1", EMU_OPT_INT, 1, NULL},
 #endif
@@ -68,6 +69,10 @@ struct emuOpts emuOptions[] = {
 {"fast_startup", "", "1 = skip ram test (does not affect Minerva)", EMU_OPT_INT, 0, NULL},
 #endif
 {"filter", "", "enable bilinear filter when zooming", EMU_OPT_INT, 0, NULL},
+#ifdef NEXTP8
+{"funcval", "", "enable FuncVal testbench mode (redirect 3MB-4MB to testbench peripherals)", EMU_OPT_FLAG, 0, NULL},
+{"funcval_type", "", "FuncVal type: auto or manual (default auto)", EMU_OPT_CHAR, 0, "auto"},
+#endif
 #ifndef NEXTP8
 {"fixaspect", "", "0 = 1:1 pixel mapping, 1 = 2:3 non square pixels, 2 = BBQL aspect non square pixels", EMU_OPT_INT, 0, NULL},
 {"iorom1", "", "rom in 1st IO area (Minerva only 0x10000 address)", EMU_OPT_CHAR, 0, NULL},
@@ -121,6 +126,17 @@ struct emuOpts emuOptions[] = {
 };
 
 static ArgParser* parser;
+
+#ifdef NEXTP8
+int funcval_mode = 0;
+uint8_t patch_version = 0xff;  /* Default to 0xff (auto) */
+#endif
+
+/* Forward declarations */
+static bool match(const char *name, const char *option);
+int emulatorOptionFlag(const char *name);
+char *emulatorOptionString(const char *name);
+int emulatorOptionInt(const char *name);
 
 static bool match(const char *name, const char *option)
 {
@@ -408,6 +424,8 @@ int emulatorOptionParse(int argc, char **argv)
 
 		if (emuOptions[i].type == EMU_OPT_INT) {
 			ap_add_int_opt(parser, optItem, 0);
+		} else if (emuOptions[i].type == EMU_OPT_FLAG) {
+			ap_add_flag(parser, optItem);
 		} else {
 			ap_add_str_opt(parser, optItem, "");
 		}
@@ -430,12 +448,39 @@ int emulatorOptionParse(int argc, char **argv)
 		sdsfreesplitres(splitDevice, count);
 	}
 #endif
+#ifdef NEXTP8
+	/* Cache funcval mode flag for fast access during memory operations */
+	funcval_mode = emulatorOptionFlag("funcval");
+	if (funcval_mode) {
+		fprintf(stderr, "FuncVal testbench mode enabled\n");
+	}
+
+	/* Parse funcval_type from command line or environment variable */
+	const char *funcval_type_str = emulatorOptionString("funcval_type");
+	if (!funcval_type_str || strlen(funcval_type_str) == 0) {
+		/* Check environment variable if command line option not provided */
+		funcval_type_str = getenv("SQLUX_FUNCVAL_TYPE");
+	}
+
+	if (funcval_type_str && strlen(funcval_type_str) > 0) {
+		if (strcasecmp(funcval_type_str, "auto") == 0) {
+			patch_version = 0xff;
+		} else if (strcasecmp(funcval_type_str, "manual") == 0) {
+			patch_version = 0xfe;
+		} else {
+			fprintf(stderr, "Warning: Invalid funcval_type '%s', using default 'auto')\n", funcval_type_str);
+			patch_version = 0xff;
+		}
+		fprintf(stderr, "FuncVal type: %s\n", funcval_type_str);
+	}
+#endif
 	configFile = ap_get_str_value(parser, "config");
 
 	if (ini_parse(configFile, iniHandler, NULL) < 0) {
 		fprintf(stderr, "Can't load '%s'\n", configFile);
 		return 1;
 	}
+
 
 	return 0;
 }

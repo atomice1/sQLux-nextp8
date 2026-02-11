@@ -21,6 +21,7 @@
 #ifdef NEXTP8
 #include "sdspi.h"
 #include "i2c_rtc.h"
+#include "funcval_testbench.h"
 #endif
 #include "sds.h"
 #include "unixstuff.h"
@@ -257,6 +258,11 @@ void emulatorInit()
 	qlscreen.qm_hi = qlscreen.qm_lo + qlscreen.qm_len;
 
 	WriteConfigPage();
+
+	/* Initialize FuncVal testbench if in funcval mode */
+	if (emulatorOptionFlag("funcval")) {
+		funcval_init();
+	}
 #endif
 
 	if (V1 && (atof(emulatorOptionString("speed")) > 0.0))
