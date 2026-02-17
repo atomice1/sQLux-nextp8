@@ -197,6 +197,11 @@ rw16 BusErrorCode(aw16 ) REGP1;
 void SetPC(w32 )  REGP1;
 void SetPCX(int )  REGP1;
 
+/* Calling convention checking functions */
+void cc_push_frame(w32 call_pc);
+void cc_pop_frame_and_check(w32 return_pc);
+void cc_poison_scratch_regs(void);
+
 STATIC rw8 ModifyAtEA_b(ashort ,ashort )  REGP2;
 STATIC rw16 ModifyAtEA_w(ashort ,ashort ) REGP2;
 STATIC rw32 ModifyAtEA_l(ashort ,ashort ) REGP2;

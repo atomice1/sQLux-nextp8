@@ -136,7 +136,94 @@ volatile w8     theInt=0;
 Cond doTrace;            /* trace after current instruction */
 
 bool asyncTrace;
+bool check_calling_convention = false;
 bool exit_on_cpu_disable = true;  /* exit emulator when CPU is disabled (RESET_REQ = 0xff) */
+
+/* Calling convention checking: stack to track saved register state */
+#define CC_STACK_MAX 1024
+typedef struct {
+    w32 pc;         /* PC at call site */
+    w32 regs[14];   /* a2-a7 (indices 0-5), d2-d7 (indices 6-11), and extra slots */
+} cc_frame_t;
+
+static cc_frame_t cc_stack[CC_STACK_MAX];
+static int cc_stack_depth = 0;
+
+void cc_push_frame(w32 call_pc) {
+    if (!check_calling_convention)
+        return;
+
+    if (cc_stack_depth >= CC_STACK_MAX) {
+        fprintf(stderr, "WARNING: Calling convention stack overflow at PC=0x%08x\n", call_pc);
+        return;
+    }
+
+    cc_frame_t *frame = &cc_stack[cc_stack_depth++];
+    frame->pc = call_pc;
+    /* Save a2-a7 (aReg indices 2-7) */
+    frame->regs[0] = aReg[2];
+    frame->regs[1] = aReg[3];
+    frame->regs[2] = aReg[4];
+    frame->regs[3] = aReg[5];
+    frame->regs[4] = aReg[6];
+    frame->regs[5] = aReg[7];
+    /* Save d2-d7 (reg indices 2-7) */
+    frame->regs[6] = reg[2];
+    frame->regs[7] = reg[3];
+    frame->regs[8] = reg[4];
+    frame->regs[9] = reg[5];
+    frame->regs[10] = reg[6];
+    frame->regs[11] = reg[7];
+}
+
+void cc_pop_frame_and_check(w32 return_pc) {
+    if (!check_calling_convention)
+        return;
+
+    if (cc_stack_depth <= 0) {
+        fprintf(stderr, "WARNING: Calling convention stack underflow at RTS to PC=0x%08x (RTS without matching JSR/BSR)\n", return_pc);
+        return;
+    }
+
+    cc_frame_t *frame = &cc_stack[--cc_stack_depth];
+    int violations = 0;
+
+    /* Check a2-a7 */
+    if (frame->regs[0] != aReg[2]) { fprintf(stderr, "WARNING: a2 modified (0x%08x -> 0x%08x) in function called at PC=0x%08x, returning to PC=0x%08x\n", frame->regs[0], aReg[2], frame->pc, return_pc); violations++; }
+    if (frame->regs[1] != aReg[3]) { fprintf(stderr, "WARNING: a3 modified (0x%08x -> 0x%08x) in function called at PC=0x%08x, returning to PC=0x%08x\n", frame->regs[1], aReg[3], frame->pc, return_pc); violations++; }
+    if (frame->regs[2] != aReg[4]) { fprintf(stderr, "WARNING: a4 modified (0x%08x -> 0x%08x) in function called at PC=0x%08x, returning to PC=0x%08x\n", frame->regs[2], aReg[4], frame->pc, return_pc); violations++; }
+    if (frame->regs[3] != aReg[5]) { fprintf(stderr, "WARNING: a5 modified (0x%08x -> 0x%08x) in function called at PC=0x%08x, returning to PC=0x%08x\n", frame->regs[3], aReg[5], frame->pc, return_pc); violations++; }
+    if (frame->regs[4] != aReg[6]) { fprintf(stderr, "WARNING: a6 modified (0x%08x -> 0x%08x) in function called at PC=0x%08x, returning to PC=0x%08x\n", frame->regs[4], aReg[6], frame->pc, return_pc); violations++; }
+    /* Note: a7 (SP) is allowed to change within reason, but should be restored. We check it but it's common to see variations */
+    if (frame->regs[5] != aReg[7]) {
+        w32 sp_diff = (aReg[7] > frame->regs[5]) ? (aReg[7] - frame->regs[5]) : (frame->regs[5] - aReg[7]);
+        if (sp_diff > 16) {  /* Allow small stack adjustments */
+            fprintf(stderr, "WARNING: a7/SP modified (0x%08x -> 0x%08x, diff=%d) in function called at PC=0x%08x, returning to PC=0x%08x\n", frame->regs[5], aReg[7], (int)sp_diff, frame->pc, return_pc);
+            violations++;
+        }
+    }
+
+    /* Check d2-d7 */
+    if (frame->regs[6] != reg[2]) { fprintf(stderr, "WARNING: d2 modified (0x%08x -> 0x%08x) in function called at PC=0x%08x, returning to PC=0x%08x\n", frame->regs[6], reg[2], frame->pc, return_pc); violations++; }
+    if (frame->regs[7] != reg[3]) { fprintf(stderr, "WARNING: d3 modified (0x%08x -> 0x%08x) in function called at PC=0x%08x, returning to PC=0x%08x\n", frame->regs[7], reg[3], frame->pc, return_pc); violations++; }
+    if (frame->regs[8] != reg[4]) { fprintf(stderr, "WARNING: d4 modified (0x%08x -> 0x%08x) in function called at PC=0x%08x, returning to PC=0x%08x\n", frame->regs[8], reg[4], frame->pc, return_pc); violations++; }
+    if (frame->regs[9] != reg[5]) { fprintf(stderr, "WARNING: d5 modified (0x%08x -> 0x%08x) in function called at PC=0x%08x, returning to PC=0x%08x\n", frame->regs[9], reg[5], frame->pc, return_pc); violations++; }
+    if (frame->regs[10] != reg[6]) { fprintf(stderr, "WARNING: d6 modified (0x%08x -> 0x%08x) in function called at PC=0x%08x, returning to PC=0x%08x\n", frame->regs[10], reg[6], frame->pc, return_pc); violations++; }
+    if (frame->regs[11] != reg[7]) { fprintf(stderr, "WARNING: d7 modified (0x%08x -> 0x%08x) in function called at PC=0x%08x, returning to PC=0x%08x\n", frame->regs[11], reg[7], frame->pc, return_pc); violations++; }
+
+    if (violations > 0) {
+        fprintf(stderr, "ERROR: %d calling convention violation(s) detected!\n", violations);
+    }
+}
+
+void cc_poison_scratch_regs(void) {
+    if (!check_calling_convention)
+        return;
+
+    /* Poison only caller-saved non-return-value registers: a1 */
+    /* a0, d0 and d1 are return value registers and must NOT be poisoned */
+    aReg[1] = 0xDEADBEEF;
+}
 
 void ProcessInterrupts(void)
 {

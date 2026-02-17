@@ -145,6 +145,8 @@ void rtr(void)
 
 void rts(void)
 {
+	w32 return_addr;
+
 #ifdef BACKTRACE
 	SetPCB((uw16 *)((Ptr)memBase + (ReadLong(*m68k_sp) & ADDR_MASK)), RTS);
 #else
@@ -161,7 +163,12 @@ void rts(void)
 		badCodeAddress = true;
 	}
 #endif
+	return_addr = (w32)((Ptr)pc - (Ptr)memBase);
 	(*m68k_sp) += 4;
+
+	/* Calling convention check: verify preserved registers and poison scratch registers */
+	cc_pop_frame_and_check(return_addr);
+	cc_poison_scratch_regs();
 
 #ifdef PROFILER
 	Profiler_RecordReturn((Ptr)pc - (Ptr)memBase);

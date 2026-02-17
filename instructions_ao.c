@@ -945,11 +945,14 @@ void bsr(void)
 {
 	w16 displ;
 	w32 oldPC;
+	w32 call_site_pc;
 
 	oldPC = (uintptr_t)pc - (uintptr_t)memBase;
+	call_site_pc = oldPC - 2;  /* BSR instruction is 2 bytes, PC points past it */
 	if ((displ = (w16)(((w8)(code & 255)))) == 0) {
 		displ = (w16)RW(pc);
 		oldPC += 2;
+		/* Long form: don't adjust call_site_pc again, it's already correct */
 #ifdef PROFILER
 		Profiler_RecordCall((Ptr)pc - (Ptr)memBase + displ, 2);
 #endif
@@ -959,6 +962,10 @@ void bsr(void)
 #endif
 	}
 	WriteLong((*m68k_sp) -= 4, oldPC);
+
+	/* Calling convention check: save register state at actual call site */
+	cc_push_frame(call_site_pc);
+
 #ifdef BACKTRACE
 	SetPCB((Ptr)pc - (Ptr)memBase + displ, BSR);
 #else
@@ -1632,9 +1639,14 @@ void jsr(void)
 	w32 ea;
 
 	w32 oldPC = (w32)((Ptr)pc - (Ptr)memBase);
+	w32 call_site_pc = oldPC - 2;  /* JSR instruction base is 2 bytes */
 	ea = ARCALL(GetEA, (code >> 3) & 7, (code & 7));
 	/* ea=GET_EA((code>>3)&7,(code&7));*/
     WriteLong((*m68k_sp) -= 4, (w32)((Ptr)pc - (Ptr)memBase));
+
+	/* Calling convention check: save register state at actual call site */
+	cc_push_frame(call_site_pc);
+
 #ifdef PROFILER
 	Profiler_RecordCall(ea, ((Ptr)pc - (Ptr)memBase) - oldPC);
 #endif
@@ -1649,7 +1661,12 @@ void jsr_displ(void)
 {
 	register w32 ea;
 	ea = (uintptr_t)pc - (uintptr_t)memBase;
+	w32 call_site_pc = ea - 2;  /* JSR instruction is 2 bytes before current PC */
 	WriteLong((*m68k_sp) -= 4, ea + 2);
+
+	/* Calling convention check: save register state at actual call site */
+	cc_push_frame(call_site_pc);
+
 #ifdef PROFILER
 	Profiler_RecordCall(ea + (w16)RW(pc), 2);
 #endif

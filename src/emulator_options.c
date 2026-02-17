@@ -35,7 +35,8 @@ static const char * const helpTextTail = "\
 enum emuOptsType {
 	EMU_OPT_INT,
 	EMU_OPT_CHAR,
-	EMU_OPT_DEV
+	EMU_OPT_DEV,
+	EMU_OPT_FLAG
 };
 
 struct emuOpts {
@@ -50,6 +51,7 @@ struct emuOpts {
 struct emuOpts emuOptions[] = {
 #ifdef NEXTP8
 {"app_args", "", "command line arguments to pass to the application", EMU_OPT_CHAR, 0, NULL},
+{"check_calling_convention", "", "check M68000 calling convention (preserve a2-a7, d2-d7)", EMU_OPT_FLAG, 0, NULL},
 {"exit_on_cpu_disable", "", "exit emulator when CPU is disabled (RESET_REQ = 0xff), default 1", EMU_OPT_INT, 1, NULL},
 #endif
 #ifndef NEXTP8
@@ -481,6 +483,11 @@ int emulatorOptionInt(const char *name)
 	}
 
 	return 0;
+}
+
+int emulatorOptionFlag(const char *name)
+{
+	return ap_count(parser, name) > 0;
 }
 
 int emulatorOptionArgc()

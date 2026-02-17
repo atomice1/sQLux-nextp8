@@ -29,6 +29,7 @@
 
 extern void DumpState(void);
 extern bool asyncTrace;
+extern bool check_calling_convention;
 extern bool exit_on_cpu_disable;
 
 static SDL_Thread *emuThread = NULL;
@@ -165,6 +166,17 @@ int main(int argc, char *argv[])
     verbose = emulatorOptionInt("verbose");
 
 #ifdef NEXTP8
+    // Enable calling convention checks if requested (command line or environment variable)
+    // Environment variable SQLUX_CHECK_CALLING_CONVENTION can enable: 1=enable
+    const char *check_cc_env = getenv("SQLUX_CHECK_CALLING_CONVENTION");
+    if (check_cc_env && atoi(check_cc_env) != 0) {
+        check_calling_convention = true;
+        fprintf(stderr, "Calling convention checks enabled (from SQLUX_CHECK_CALLING_CONVENTION environment variable)\n");
+    } else if (emulatorOptionFlag("check_calling_convention")) {
+        check_calling_convention = true;
+        fprintf(stderr, "Calling convention checks enabled at startup\n");
+    }
+
     // Check exit_on_cpu_disable option (command line or environment variable)
     // Environment variable SQLUX_EXIT_ON_CPU_DISABLE can override: 0=disable, 1=enable
     const char *exit_on_cpu_disable_env = getenv("SQLUX_EXIT_ON_CPU_DISABLE");
