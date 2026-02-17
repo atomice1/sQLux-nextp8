@@ -26,7 +26,7 @@ int extInt=0;
 
 #ifdef DEBUG
 #define TRR  {trace_rts=20;}
-#else 
+#else
 #define TRR
 #endif
 
@@ -136,15 +136,16 @@ volatile w8     theInt=0;
 Cond doTrace;            /* trace after current instruction */
 
 bool asyncTrace;
+bool exit_on_cpu_disable = true;  /* exit emulator when CPU is disabled (RESET_REQ = 0xff) */
 
-void ProcessInterrupts(void) 
-{   
+void ProcessInterrupts(void)
+{
   /* gestione interrupts */
   if( exception==0 && (pendingInterrupt==7 || pendingInterrupt>iMask)
       && !doTrace)
-    {    
+    {
       if(!supervisor)
-	{   
+	{
 	  usp=(*m68k_sp);
 	  (*m68k_sp)=ssp;
 	}
@@ -163,7 +164,7 @@ void ProcessInterrupts(void)
 }
 
 rw16 GetSR(void)
-{   
+{
   rw16 sr;
   sr=(w16)iMask<<8;
   if(trace) sr|=0x8000;
@@ -513,7 +514,7 @@ void InitialSetup(void) /* 68K state when powered on */
   ssp=*m68k_sp=RL(&memBase[0]);
   SetPC(RL(&memBase[1]));
   if(V3)printf("initial PC=%x SP=%x\n",(w32)((void*)pc-(void*)memBase),ssp);
-	
+
   iMask=7;
   supervisor=true;
   trace=doTrace=false;

@@ -50,6 +50,7 @@ struct emuOpts {
 struct emuOpts emuOptions[] = {
 #ifdef NEXTP8
 {"app_args", "", "command line arguments to pass to the application", EMU_OPT_CHAR, 0, NULL},
+{"exit_on_cpu_disable", "", "exit emulator when CPU is disabled (RESET_REQ = 0xff), default 1", EMU_OPT_INT, 1, NULL},
 #endif
 #ifndef NEXTP8
 {"bdi1", "", "file exposed by the BDI interface", EMU_OPT_CHAR, 0 , NULL},

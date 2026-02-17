@@ -29,6 +29,7 @@
 
 extern void DumpState(void);
 extern bool asyncTrace;
+extern bool exit_on_cpu_disable;
 
 static SDL_Thread *emuThread = NULL;
 
@@ -162,6 +163,22 @@ int main(int argc, char *argv[])
     const char *resString = emulatorOptionString("resolution");
     parse_screen(resString);
     verbose = emulatorOptionInt("verbose");
+
+#ifdef NEXTP8
+    // Check exit_on_cpu_disable option (command line or environment variable)
+    // Environment variable SQLUX_EXIT_ON_CPU_DISABLE can override: 0=disable, 1=enable
+    const char *exit_on_cpu_disable_env = getenv("SQLUX_EXIT_ON_CPU_DISABLE");
+    if (exit_on_cpu_disable_env) {
+        exit_on_cpu_disable = (atoi(exit_on_cpu_disable_env) != 0);
+        fprintf(stderr, "Exit on CPU disable %s (from SQLUX_EXIT_ON_CPU_DISABLE environment variable)\n",
+                exit_on_cpu_disable ? "enabled" : "disabled");
+    } else {
+        exit_on_cpu_disable = (emulatorOptionInt("exit_on_cpu_disable") != 0);
+        if (!exit_on_cpu_disable) {
+            fprintf(stderr, "Exit on CPU disable disabled (from command line)\n");
+        }
+    }
+#endif
 
     // setup the boot_cmd if needed
 #ifndef NEXTP8

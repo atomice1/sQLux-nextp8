@@ -362,8 +362,15 @@ void WriteHWByte(aw32 addr, aw8 d)
 		break;
 	case _RESET_REQ:
 		printf("RESET_REQ: 0x%02x\n", d & 0xff);
-		printf("Shutdown requested by application\n");
-		cleanup(0);
+		if ((d & 0xff) == 0xff) {
+			extern bool exit_on_cpu_disable;
+			if (exit_on_cpu_disable) {
+				printf("CPU disabled - shutdown requested by application\n");
+				cleanup(0);
+			} else {
+				printf("CPU disabled (exit on CPU disable is disabled)\n");
+			}
+		}
 		break;
 #else
 	case 0x018063: /* Display control */
