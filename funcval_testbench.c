@@ -57,8 +57,9 @@ static double da_src_pos = 0.0;
 /* Keyboard registers (0x380001) */
 #define FUNCVAL_KB_SCANCODE      0x380001
 
-/* Mouse registers (0x380020-0x380026) */
-#define FUNCVAL_MOUSE_BUTTONS    0x380021
+/* Mouse TB registers (0x380020-0x380026).
+ * Protocol: write buttons, X, Y, Z in that order; writing Z triggers the update. */
+#define FUNCVAL_MOUSE_BUTTONS    0x380020
 #define FUNCVAL_MOUSE_X          0x380022
 #define FUNCVAL_MOUSE_Y          0x380024
 #define FUNCVAL_MOUSE_Z          0x380026
@@ -192,8 +193,19 @@ static int16_t mouse_x = 0;
 static int16_t mouse_y = 0;
 static int8_t mouse_z = 0;
 
+/* Pending mouse TB register values; applied to SDL state when Z is written */
+static uint16_t pending_mouse_buttons = 0;
+static int16_t  pending_mouse_x = 0;
+static int16_t  pending_mouse_y = 0;
+
 /* PS/2 scancode state machine */
-static uint8_t ps2_state = 0;  /* 0 = normal, 1 = saw 0xF0 (break), 2 = saw 0xE0 (extended) */
+typedef enum {
+	PS2_STATE_NORMAL,         /* Awaiting first byte of sequence */
+	PS2_STATE_BREAK,          /* Saw 0xF0 (break prefix) */
+	PS2_STATE_EXTENDED,       /* Saw 0xE0 (extended prefix) */
+	PS2_STATE_EXTENDED_BREAK, /* Saw 0xE0 0xF0 (extended break prefix) */
+} ps2_state_t;
+static ps2_state_t ps2_state = PS2_STATE_NORMAL;
 
 /* VGA framebuffer range: 0x390000 - 0x398000 (128x128x2 bytes = 32,768 bytes)
  * Each pixel represents 1/6 scale: samples at (x*6+3+130, y*6+3) from VGA buffer */
@@ -205,20 +217,20 @@ static void funcval_latch_scancode(uint8_t data)
 {
 	if (data == 0xF0) {
 		/* Break prefix - next byte is key release */
-		ps2_state = 1;
+		ps2_state = (ps2_state == PS2_STATE_EXTENDED) ? PS2_STATE_EXTENDED_BREAK : PS2_STATE_BREAK;
 		return;
 	} else if (data == 0xE0) {
 		/* Extended scancode prefix */
-		ps2_state = 2;
+		ps2_state = PS2_STATE_EXTENDED;
 		return;
 	}
 
 	/* Process scancode based on state */
-	int press = (ps2_state != 1);  /* 1 = press, 0 = release */
+	int press = (ps2_state != PS2_STATE_BREAK && ps2_state != PS2_STATE_EXTENDED_BREAK);
 	int code = data;
 
 	/* For extended scancodes, set bit 7 */
-	if (ps2_state == 2) {
+	if (ps2_state == PS2_STATE_EXTENDED || ps2_state == PS2_STATE_EXTENDED_BREAK) {
 		code |= 0x80;
 	}
 
@@ -226,7 +238,7 @@ static void funcval_latch_scancode(uint8_t data)
 	SDLQLKeyrowChg(code, press);
 
 	/* Reset state machine */
-	ps2_state = 0;
+	ps2_state = PS2_STATE_NORMAL;
 
 	if (asyncTrace) {
 		printf("FuncVal PS/2: scancode 0x%02X -> code 0x%02X, %s\n",
@@ -595,18 +607,6 @@ void funcval_write_byte(aw32 addr, aw8 data)
 		return;
 	}
 
-	/* Mouse button state */
-	if (addr == FUNCVAL_MOUSE_BUTTONS) {
-		sdl_mouse_buttons = data & 0x1F;
-		sdl_mouse_buttons_latched |= data & 0x1F;
-		return;
-	}
-
-	/* Mouse Z scroll - accumulate signed increment */
-	if (addr == FUNCVAL_MOUSE_Z) {
-		sdl_mouse_z_accum += (int16_t)(int8_t)data;
-		return;
-	}
 
 	/* Screenshot register - trigger screenshot on any write */
 	if (addr == FUNCVAL_SCREENSHOT_REG) {
@@ -679,31 +679,36 @@ void funcval_write_byte(aw32 addr, aw8 data)
 /* Write word to testbench (big-endian) */
 void funcval_write_word(aw32 addr, aw16 data)
 {
-	/* Mouse button state */
+	/* Mouse button state - stage for later commit when Z is written */
 	if (addr == FUNCVAL_MOUSE_BUTTONS) {
-		sdl_mouse_buttons = data & 0x1F;
-		sdl_mouse_buttons_latched |= data & 0x1F;
+		pending_mouse_buttons = data & 0x1F;
 		return;
 	}
 
-	/* Mouse X movement - accumulate signed increment */
+	/* Mouse X movement - stage signed delta */
 	if (addr == FUNCVAL_MOUSE_X) {
-		sdl_mouse_x_accum += (int16_t)data;
+		pending_mouse_x = (int16_t)data;
 		return;
 	}
 
-	/* Mouse Y movement - accumulate signed increment */
+	/* Mouse Y movement - stage signed delta */
 	if (addr == FUNCVAL_MOUSE_Y) {
-		sdl_mouse_y_accum += (int16_t)data;
+		pending_mouse_y = (int16_t)data;
 		return;
 	}
 
-	/* Mouse Z scroll - accumulate signed increment */
+	/* Mouse Z scroll - latch all staged values and trigger update */
 	if (addr == FUNCVAL_MOUSE_Z) {
+		sdl_mouse_buttons = pending_mouse_buttons;
+		sdl_mouse_buttons_latched |= pending_mouse_buttons;
+		sdl_mouse_x_accum += pending_mouse_x;
+		sdl_mouse_y_accum += pending_mouse_y;
 		sdl_mouse_z_accum += (int16_t)data;
+		pending_mouse_buttons = 0;
+		pending_mouse_x = 0;
+		pending_mouse_y = 0;
 		return;
 	}
-
 
 	/* Writes to unimplemented regions are ignored */
 }

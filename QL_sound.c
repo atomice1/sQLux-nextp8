@@ -76,7 +76,7 @@ static void silenceBuffer(int start, Sint8* buffer, int len);
 
 #ifdef NEXTP8
 #define FREQUENCY 5513		// Requested sampling frequency
-#define SAMPLES 512		// Number of samples in a callback
+#define SAMPLES 64		// Number of samples in a callback (small to minimise da_address jumps)
 #else
 #define FREQUENCY 24000		// Requested sampling frequency
 #define SAMPLES 256		// Number of samples in a callback
@@ -89,6 +89,11 @@ bool da_mono = 0;
 uint16_t da_period = 0;
 int16_t da_memory[DA_SAMPLES];
 unsigned da_address = 0;
+/* Fractional accumulator for da_period-based address advancement.
+ * Incremented by DA_CLOCK_FREQ each output sample; da_address advances
+ * when it reaches da_period * FREQUENCY, giving correct playback rate. */
+static unsigned long long da_addr_accum = 0;
+#define DA_CLOCK_FREQ 65000000ULL
 #endif
 
 void initSound(int volume) {
@@ -276,28 +281,35 @@ void KillSound() {
 }
 
 #ifdef NEXTP8
-static int min(int a, int b) {
-	if (a < b)
-		return a;
-	else
-		return b;
-}
 void audioCallback(void* userdata, Uint8* stream, int len) {
 	UNUSED(userdata);
 	int16_t *samples = (int16_t *)stream;
-	while (len > 0) {
-		int next_chunk = min(len, (DA_SAMPLES - da_address) * sizeof(int16_t));
+	/* Advance da_address at DA_CLOCK_FREQ / da_period Hz (the hardware rate),
+	 * independent of the SDL output rate (FREQUENCY Hz).
+	 * Uses a fractional accumulator: increment by DA_CLOCK_FREQ each output
+	 * sample; each time it reaches da_period * FREQUENCY, advance da_address. */
+	const unsigned long long threshold = (unsigned long long)da_period * FREQUENCY;
+	while (len >= (int)sizeof(int16_t)) {
+		if (da_start && da_period > 0) {
+			/* Output current sample */
 #if __BYTE_ORDER == __BIG_ENDIAN
-		memcpy(samples, da_memory + da_address, next_chunk);
-		da_address += next_chunk / sizeof(int16_t);
+			*samples++ = da_memory[da_address];
 #else
-		for (int i=0;i<next_chunk / sizeof(int16_t);++i)
-			*samples++ = __builtin_bswap16(da_memory[da_address++]);
+			*samples++ = __builtin_bswap16(da_memory[da_address]);
 #endif
-		len -= next_chunk;
-		assert(da_address <= DA_SAMPLES);
-		if (da_address == DA_SAMPLES)
-			da_address -= DA_SAMPLES;
+			/* Advance address by da_period-derived ratio */
+			da_addr_accum += DA_CLOCK_FREQ;
+			while (da_addr_accum >= threshold) {
+				da_addr_accum -= threshold;
+				da_address++;
+				if (da_address >= DA_SAMPLES)
+					da_address = 0;
+			}
+		} else {
+			/* Stopped: output silence */
+			*samples++ = 0;
+		}
+		len -= sizeof(int16_t);
 	}
 }
 #else

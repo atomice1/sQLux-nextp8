@@ -455,8 +455,9 @@ void WriteHWByte(aw32 addr, aw8 d)
 			overlayBuffer[vfront][addr - _OVERLAY_FRONT_BUFFER_BASE] = d;
 			return;
 		}
-		if (addr >= _PALETTE_BASE && addr < _PALETTE_BASE + _PALETTE_SIZE) {
-			screenPalette[addr - _PALETTE_BASE] = d;
+		if (addr >= _PALETTE_BASE && addr < _PALETTE_BASE + _PALETTE_SIZE * 2) {
+			int bank = (addr & 0x10) ? vfront : (1 - vfront);
+			screenPalette[bank][addr & 0x0F] = d;
 			return;
 		}
 		if (addr >= _KEYBOARD_MATRIX_LATCHED &&
@@ -621,9 +622,7 @@ rw8 ReadHWByte(aw32 addr)
 			return sdl_mouse_buttons;
 		}
 		if (addr == _MOUSE_BUTTONS_LATCHED) {
-			uint8_t value = sdl_mouse_buttons_latched;
-			sdl_mouse_buttons_latched = 0;
-			return value;
+			return sdl_mouse_buttons_latched;
 		}
 		if (addr >= _DA_MEMORY_BASE && addr < _DA_MEMORY_BASE + _DA_MEMORY_SIZE) {
 			if ((addr & 1) == 0)
@@ -639,8 +638,10 @@ rw8 ReadHWByte(aw32 addr)
 			return overlayBuffer[1-vfront][addr - _OVERLAY_BACK_BUFFER_BASE] & 0xff;
 		if (addr >= _OVERLAY_FRONT_BUFFER_BASE && addr < _OVERLAY_FRONT_BUFFER_BASE + 8192)
 			return overlayBuffer[vfront][addr - _OVERLAY_FRONT_BUFFER_BASE] & 0xff;
-		if (addr >= _PALETTE_BASE && addr < _PALETTE_BASE + _PALETTE_SIZE)
-			return screenPalette[addr - _PALETTE_BASE] & 0xff;
+		if (addr >= _PALETTE_BASE && addr < _PALETTE_BASE + _PALETTE_SIZE * 2) {
+			int bank = (addr & 0x10) ? vfront : (1 - vfront);
+			return screenPalette[bank][addr & 0x0F] & 0xff;
+		}
 		if (addr >= _P8AUDIO_BASE && addr < _P8AUDIO_BASE + 0x100)
 			return 0;
 #endif
@@ -737,7 +738,7 @@ void WriteHWWord(aw32 addr, aw16 d)
 		!(addr >= _FRONT_BUFFER_BASE && addr < _FRONT_BUFFER_BASE + _FRAME_BUFFER_SIZE) &&
 		!(addr >= _OVERLAY_BACK_BUFFER_BASE && addr < _OVERLAY_BACK_BUFFER_BASE + 8192) &&
 		!(addr >= _OVERLAY_FRONT_BUFFER_BASE && addr < _OVERLAY_FRONT_BUFFER_BASE + 8192) &&
-		!(addr >= _PALETTE_BASE && addr < _PALETTE_BASE + _PALETTE_SIZE) &&
+		!(addr >= _PALETTE_BASE && addr < _PALETTE_BASE + _PALETTE_SIZE * 2) &&
 		!(addr >= _KEYBOARD_MATRIX_LATCHED && addr < _KEYBOARD_MATRIX_LATCHED + 0x20) &&
 		addr != _JOYSTICK0_LATCHED && addr != _JOYSTICK1_LATCHED && addr != _MOUSE_BUTTONS_LATCHED)
 		printf("WriteHWWord at 0x%lx val=0x%x\n", (unsigned long) addr, ((unsigned) d) & 0xffff);

@@ -19,7 +19,12 @@ screen_specs qlscreen =
 #ifdef NEXTP8
 uint8_t frameBuffer[2][8192];
 uint8_t overlayBuffer[2][8192];
-uint8_t screenPalette[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+/* Double-buffered palette: screenPalette[bank][byte_offset], 16 bytes per bank.
+ * Byte handlers select bank by addr[4] and vfront; rendering uses screenPalette[vfront]. */
+uint8_t screenPalette[2][16] = {
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+};
 int vfront = 0, vfrontreq = 0;
 uint8_t overlay_control = 0;  // [3:0] transparent index, [6] enable
 uint8_t vblank_intr_enable = 0;  // VBLANK interrupt enable (bit 0)

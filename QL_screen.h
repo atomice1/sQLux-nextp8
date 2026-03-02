@@ -22,7 +22,7 @@ void QLPatchPTRENV(void);
 #ifdef NEXTP8
 extern uint8_t frameBuffer[2][8192];
 extern uint8_t overlayBuffer[2][8192];
-extern uint8_t screenPalette[16];
+extern uint8_t screenPalette[2][16]; /* [bank][byte_offset]; bank selected by vfront */
 extern int vfront, vfrontreq;
 extern uint8_t overlay_control;
 extern uint8_t vblank_intr_enable;

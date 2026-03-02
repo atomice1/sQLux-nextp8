@@ -613,8 +613,8 @@ static void emulatorUpdatePixelBufferQL(uint32_t *pixelPtr32,
 		uint8_t t = *emulatorScreenPtr++;
 		uint8_t lo_index = t & 0xf;
 		uint8_t hi_index = (t >> 4) & 0xf;
-		uint32_t lo_colour = SDLcolors[color_index(screenPalette[lo_index])];
-		uint32_t hi_colour = SDLcolors[color_index(screenPalette[hi_index])];
+		uint32_t lo_colour = SDLcolors[color_index(screenPalette[vfront][lo_index])];
+		uint32_t hi_colour = SDLcolors[color_index(screenPalette[vfront][hi_index])];
 
 		if (overlay_control & _OVERLAY_ENABLE_BIT) {
 			int overlay_offset = (emulatorScreenPtr - 1 - (uint8_t *)&frameBuffer[vfront]);

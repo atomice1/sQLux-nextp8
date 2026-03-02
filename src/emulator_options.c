@@ -71,7 +71,7 @@ struct emuOpts emuOptions[] = {
 {"filter", "", "enable bilinear filter when zooming", EMU_OPT_INT, 0, NULL},
 #ifdef NEXTP8
 {"funcval", "", "enable FuncVal testbench mode (redirect 3MB-4MB to testbench peripherals)", EMU_OPT_FLAG, 0, NULL},
-{"funcval_type", "", "FuncVal type: auto or manual (default auto)", EMU_OPT_CHAR, 0, "auto"},
+{"funcval_type", "", "FuncVal type: auto or manual (default auto)", EMU_OPT_CHAR, 0, ""},
 #endif
 #ifndef NEXTP8
 {"fixaspect", "", "0 = 1:1 pixel mapping, 1 = 2:3 non square pixels, 2 = BBQL aspect non square pixels", EMU_OPT_INT, 0, NULL},
@@ -455,10 +455,11 @@ int emulatorOptionParse(int argc, char **argv)
 		fprintf(stderr, "FuncVal testbench mode enabled\n");
 	}
 
-	/* Parse funcval_type from command line or environment variable */
-	const char *funcval_type_str = emulatorOptionString("funcval_type");
-	if (!funcval_type_str || strlen(funcval_type_str) == 0) {
-		/* Check environment variable if command line option not provided */
+	/* Parse funcval_type: command line takes priority, then environment variable */
+	const char *funcval_type_str = NULL;
+	if (ap_count(parser, "funcval_type") > 0) {
+		funcval_type_str = ap_get_str_value(parser, "funcval_type");
+	} else {
 		funcval_type_str = getenv("SQLUX_FUNCVAL_TYPE");
 	}
 
