@@ -704,9 +704,9 @@ rw16 ReadHWWord(aw32 addr)
 		return (uint16_t)sdl_mouse_y_accum;
 	case _MOUSE_Z:
 		return (uint16_t)sdl_mouse_z_accum;
-	case 0x80000a: /* _DEBUG_REG_HI */
+	case _DEBUG_REG_HI:
 		return debug_reg_hi;
-	case 0x80000c: /* _DEBUG_REG_LO */
+	case _DEBUG_REG_LO:
 		return debug_reg_lo;
 #else
 	case 0x018108:
