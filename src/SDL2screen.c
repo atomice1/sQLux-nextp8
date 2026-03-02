@@ -719,7 +719,7 @@ static void QLSDLUpdatePixelBuffer()
 #ifdef NEXTP8
 	static bool debug_next;
 	if (vfront != vfrontreq || debug_next) {
-		printf("VFRONT: %d VFRONTREQ: %d\n", vfront, vfrontreq);
+		//printf("VFRONT: %d VFRONTREQ: %d\n", vfront, vfrontreq);
 		debug_next = vfront != vfrontreq;
 	}
 	vfront = vfrontreq;
@@ -751,7 +751,7 @@ void QLSDLWritePixels(uint32_t *pixelPtr32)
 #ifdef NEXTP8
 	static bool debug_next;
 	if (vfront != vfrontreq || debug_next) {
-		printf("VFRONT: %d VFRONTREQ: %d\n", vfront, vfrontreq);
+		//printf("VFRONT: %d VFRONTREQ: %d\n", vfront, vfrontreq);
 		debug_next = vfront != vfrontreq;
 	}
 	vfront = vfrontreq;
