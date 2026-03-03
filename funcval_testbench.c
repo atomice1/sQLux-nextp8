@@ -661,8 +661,8 @@ void funcval_write_byte(aw32 addr, aw8 data)
 			/* Extract bit value from data and determine press/release */
 			int bit_set = (data >> bit) & 1;
 
-			/* Send press or release based on bit value */
-			SDLQLKeyrowChg(scancode, bit_set ? 1 : 0);
+			/* Columns are active-low: 0 = pressed, 1 = released */
+			SDLQLKeyrowChg(scancode, bit_set ? 0 : 1);
 
 			if (asyncTrace) {
 				printf("FuncVal KB Matrix: row %d, bit %d, scancode 0x%02X -> code 0x%02X, %s\n",
