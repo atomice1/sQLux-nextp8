@@ -65,6 +65,12 @@ endif()
 set(CMAKE_CXX_FLAGS ${CMAKE_C_FLAGS})
 
 find_package(Git)
+
+find_package(verilator HINTS $ENV{VERILATOR_ROOT} /usr/share/verilator /usr)
+if (NOT verilator_FOUND)
+  message(FATAL_ERROR "Verilator not found. Install verilator or set VERILATOR_ROOT.")
+endif()
+
 add_custom_target(
   SubmarineGitVersion
   COMMAND
@@ -172,12 +178,9 @@ add_executable(
   instructions_ao.c
   instructions_pz.c
   memaccess.c
-  p8audio.c
-  p8_audio.c
-  p8_dsp.c
+  p8audio_verilated.cpp
   pty.c
   qmtrap.c
-  queue.c
   sdspi.cpp
   sdspisim.cpp
   trace.c
@@ -202,12 +205,27 @@ add_executable(
   ${PROFILER_SOURCES})
 set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/version.c
   PROPERTIES GENERATED TRUE)
-set_source_files_properties(p8_audio.c
-    PROPERTIES COMPILE_FLAGS "-UNEXTP8 -DSDL -DENABLE_AUDIO -DSDL_OpenAudio=SDL_OpenAudio_shim")
+set_source_files_properties(p8audio_verilated.cpp
+    PROPERTIES COMPILE_FLAGS "-DSDL -DENABLE_AUDIO -DSDL_OpenAudio=SDL_OpenAudio_shim")
 set_source_files_properties(QL_sound.c
     PROPERTIES COMPILE_FLAGS "-DSDL_OpenAudioDevice=SDL_OpenAudioDevice_shim")
 
 add_dependencies(${SQLUX_EXECUTABLE_NAME} SubmarineGitVersion)
+
+# Verilate the p8audio SV sources into C++ and link into the executable.
+# Use REALPATH to normalize away '..' so Verilator doesn't get confused when
+# combining the -y search dir with the absolute source file path.
+if(NOT DEFINED NEXTP8_CORE)
+  get_filename_component(NEXTP8_CORE
+      ${CMAKE_CURRENT_SOURCE_DIR}/../nextp8-core REALPATH)
+endif()
+get_filename_component(P8AUDIO_SV_DIR ${NEXTP8_CORE}/nextp8.srcs/sources_1 REALPATH)
+verilate(${SQLUX_EXECUTABLE_NAME}
+    PREFIX Vp8audio
+    TOP_MODULE p8audio
+    SOURCES ${P8AUDIO_SV_DIR}/p8audio.sv
+    INCLUDE_DIRS ${P8AUDIO_SV_DIR}
+    VERILATOR_ARGS --sv --no-timing -Wno-WIDTH -Wno-IMPLICITSTATIC -Wno-CASEINCOMPLETE)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
   target_sources(${SQLUX_EXECUTABLE_NAME} PRIVATE sQLuxLogo.rc)
@@ -238,6 +256,7 @@ if(SDL2_LIBRARIES)
   if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     target_link_libraries(
       ${SQLUX_EXECUTABLE_NAME}
+      PRIVATE
       -Wl,-Bstatic
       -L/usr/local/${TOOLCHAIN_PREFIX}/lib
       ${SDL2_GPU_LIB_DIRS}
@@ -254,22 +273,22 @@ if(SDL2_LIBRARIES)
       -static-libgcc
       -static-libstdc++)
   else()
-    target_link_libraries(${SQLUX_EXECUTABLE_NAME} ${SDL2_GPU_LIB_DIRS} ${SDL2_LIBRARIES}
+    target_link_libraries(${SQLUX_EXECUTABLE_NAME} PRIVATE ${SDL2_GPU_LIB_DIRS} ${SDL2_LIBRARIES}
       ${SDL2_GPU_LIBRARIES})
   endif()
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Emscripten")
-  target_link_libraries(${SQLUX_EXECUTABLE_NAME} ${SDL2_LIBRARIES})
+  target_link_libraries(${SQLUX_EXECUTABLE_NAME} PRIVATE ${SDL2_LIBRARIES})
 else()
-  target_link_libraries(${SQLUX_EXECUTABLE_NAME} SDL2::SDL2 ${SDL2_GPU_LIBRARIES})
+  target_link_libraries(${SQLUX_EXECUTABLE_NAME} PRIVATE SDL2::SDL2 ${SDL2_GPU_LIBRARIES})
 endif()
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-  target_link_libraries(${SQLUX_EXECUTABLE_NAME} -Wl,-Bstatic -lpthread -lssp -Wl,-Bdynamic)
+  target_link_libraries(${SQLUX_EXECUTABLE_NAME} PRIVATE -Wl,-Bstatic -lpthread -lssp -Wl,-Bdynamic)
 endif()
 
 # Link against socket libraries for ESP8266 model
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-  target_link_libraries(${SQLUX_EXECUTABLE_NAME} -lm -lssl -lcrypto -lSDL2_image -ldl)
+  target_link_libraries(${SQLUX_EXECUTABLE_NAME} PRIVATE -lm -lssl -lcrypto -lSDL2_image -ldl)
 endif()
 
 set_target_properties(${SQLUX_EXECUTABLE_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)

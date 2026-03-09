@@ -21,7 +21,7 @@
 #ifdef NEXTP8
 #include "nextp8.h"
 #include "sdspi.h"
-#include "p8audio.h"
+#include "p8audio_verilated.h"
 #include "uart.h"
 #include "i2c_rtc.h"
 #include "esp8266_model.h"
@@ -642,8 +642,14 @@ rw8 ReadHWByte(aw32 addr)
 			int bank = (addr & 0x10) ? vfront : (1 - vfront);
 			return screenPalette[bank][addr & 0x0F] & 0xff;
 		}
-		if (addr >= _P8AUDIO_BASE && addr < _P8AUDIO_BASE + 0x100)
+		if (addr >= _P8AUDIO_BASE && addr < _P8AUDIO_BASE + 0x100) {
+			if (addr >= _P8AUDIO_STAT46 && addr <= _P8AUDIO_STAT57 + 1) {
+				uint16_t w = p8audio_verilated_mmio_read(
+					(uint8_t)((addr & ~1u) - _P8AUDIO_BASE));
+				return (addr & 1u) ? (w & 0xFF) : ((w >> 8) & 0xFF);
+			}
 			return 0;
+		}
 #endif
 		debug2("Read from HW register ", addr);
 		debug2("at (PC-2) ", (Ptr)pc - (Ptr)memBase - 2);
@@ -699,6 +705,19 @@ rw16 ReadHWWord(aw32 addr)
 	}
 	case _P8AUDIO_VERSION:
 		return P8AUDIO_VERSION;
+	case _P8AUDIO_STAT46:
+	case _P8AUDIO_STAT47:
+	case _P8AUDIO_STAT48:
+	case _P8AUDIO_STAT49:
+	case _P8AUDIO_STAT50:
+	case _P8AUDIO_STAT51:
+	case _P8AUDIO_STAT52:
+	case _P8AUDIO_STAT53:
+	case _P8AUDIO_STAT54:
+	case _P8AUDIO_STAT55:
+	case _P8AUDIO_STAT56:
+	case _P8AUDIO_STAT57:
+		return p8audio_verilated_mmio_read((uint8_t)(addr - _P8AUDIO_BASE));
 	case _MOUSE_X:
 		return (uint16_t)sdl_mouse_x_accum;
 	case _MOUSE_Y:
@@ -754,31 +773,15 @@ void WriteHWWord(aw32 addr, aw16 d)
 		printf("da_period = %u\n", da_period);
 		break;
 	case _P8AUDIO_CTRL:
-		p8audio_control = d;
-		break;
 	case _P8AUDIO_SFX_BASE_HI:
-		p8audio_sfx_base_hi = d;
-		break;
 	case _P8AUDIO_SFX_BASE_LO:
-		p8audio_sfx_base_lo = d;
-		break;
 	case _P8AUDIO_MUSIC_BASE_HI:
-		p8audio_music_base_hi = d;
-		break;
 	case _P8AUDIO_MUSIC_BASE_LO:
-		p8audio_music_base_lo = d;
-		break;
 	case _P8AUDIO_SFX_LEN:
-		p8audio_sfx_length = d;
-		break;
 	case _P8AUDIO_MUSIC_FADE:
-		p8audio_music_fade_time = d;
-		break;
 	case _P8AUDIO_SFX_CMD:
-		p8audio_sfx_command(d);
-		break;
 	case _P8AUDIO_MUSIC_CMD:
-		p8audio_music_command(d);
+		p8audio_verilated_mmio_write((uint8_t)(addr - _P8AUDIO_BASE), d);
 		break;
 	case _UART_BAUD_DIV:
 		UART_TickAndReceive(1);
