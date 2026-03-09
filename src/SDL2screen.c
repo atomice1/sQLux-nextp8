@@ -1619,6 +1619,7 @@ void QLSDProcessKey(SDL_Keysym *keysym, int pressed)
 		queueKey(1 << 2, 56, 0);
 		return;
 	}
+#ifndef NEXTP8
 	/* Page Up maps to shift down */
 	if ((keysym->sym == SDLK_PAGEUP) && pressed) {
 		queueKey(1 << 2, 50, 0);
@@ -1629,6 +1630,7 @@ void QLSDProcessKey(SDL_Keysym *keysym, int pressed)
 		queueKey(1 << 2, 55, 0);
 		return;
 	}
+#endif
 
 	switch (keysym->sym) {
 	case SDLK_LSHIFT:
