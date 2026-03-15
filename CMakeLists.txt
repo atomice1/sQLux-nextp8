@@ -223,7 +223,7 @@ get_filename_component(P8AUDIO_SV_DIR ${NEXTP8_CORE}/nextp8.srcs/sources_1 REALP
 verilate(${SQLUX_EXECUTABLE_NAME}
     PREFIX Vp8audio
     TOP_MODULE p8audio
-    SOURCES ${P8AUDIO_SV_DIR}/p8audio.sv
+    SOURCES ${P8AUDIO_SV_DIR}/p8audio.sv ${P8AUDIO_SV_DIR}/fp_ops.sv
     INCLUDE_DIRS ${P8AUDIO_SV_DIR}
     VERILATOR_ARGS --sv --no-timing -Wno-WIDTH -Wno-IMPLICITSTATIC -Wno-CASEINCOMPLETE)
 
