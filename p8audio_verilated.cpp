@@ -25,6 +25,7 @@
 #include "p8_emu.h"     /* m_memory, memBase */
 
 #include "Vp8audio.h"
+#include "Vp8audio___024root.h"
 #include "verilated.h"
 
 #include <SDL.h>
@@ -39,6 +40,9 @@
  * Clock ratios
  *==============================================================*/
 static const int PCM_8X_PER_PCM   = 8;
+
+/* PCM output width — must match p8audio.sv parameter PCM_WID */
+#define PCM_WID 8
 
 /* SDL output configuration */
 static const int SAMPLE_RATE_HW   = 22050;  /* matches clk_pcm */
@@ -238,9 +242,9 @@ static void update_stat_cache(void)
  * complete before any mclk edge, so the pulse is always missed and the
  * music sequencer never advances past the first pattern.
  *
- * Returns the new pcm_out value (signed 8-bit, biased to int8_t range).
+ * Returns the new pcm_out value (signed PCM_WID-bit, sign-extended to int16_t).
  *==============================================================*/
-static int8_t advance_one_sample(void)
+static int16_t advance_one_sample(void)
 {
     for (int slot = 0; slot < PCM_8X_PER_PCM; slot++) {
         tick_8x(1);
@@ -252,7 +256,8 @@ static int8_t advance_one_sample(void)
 
     tick_pcm(1);   /* clk_pcm rising – model outputs sample */
     tick_pcm(0);
-    int8_t s = (int8_t)(uint8_t)s_model->pcm_out;
+    /* Sign-extend PCM_WID-bit pcm_out to int16_t. */
+    int16_t s = (int16_t)((s_model->pcm_out ^ (1u << (PCM_WID - 1))) - (1u << (PCM_WID - 1)));
     update_stat_cache();
     return s;
 }
@@ -269,9 +274,9 @@ static void audio_callback_verilated(void *userdata, uint8_t *stream, int len)
     flush_mmio_queue();
 
     for (int i = 0; i < samples; i++) {
-        int8_t s8 = advance_one_sample();
-        /* Scale signed 8-bit → signed 16-bit */
-        buf[i] = (int16_t)s8 << 8;
+        int16_t s_pcm = advance_one_sample();
+        /* Scale signed PCM_WID-bit → signed 16-bit */
+        buf[i] = s_pcm << (16 - PCM_WID);
     }
 }
 
