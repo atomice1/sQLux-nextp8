@@ -250,7 +250,14 @@ static int16_t advance_one_sample(void)
         tick_8x(1);
         tick_8x(0);
         tick_mclk(1);
-        service_dma();
+        if (s_model->dma_req) {
+            for (int i=0;i<200;++i) {
+                service_dma();
+                tick_mclk(0);
+                tick_mclk(1);
+            }
+            service_dma();
+        }
         tick_mclk(0);
     }
 

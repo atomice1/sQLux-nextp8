@@ -22,11 +22,14 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/signal.h>
 #include <SDL2/SDL.h>
 #include "QL68000.h"
 #include "funcval_testbench.h"
 #include "SDL2screen.h"
+#include "QL_sound.h"
 
 /* External asyncTrace flag for test logging */
 extern bool asyncTrace;
@@ -294,6 +297,13 @@ static void wav_write_header(FILE *f, int n_samples)
 	fwrite(&bytes, 4, 1, f);
 }
 
+static void funcval_wav_stop_recording(void);
+static void sighandler(int signo)
+{
+    funcval_wav_stop_recording();
+	raise(signo);
+}
+
 /* Start WAV recording */
 static void funcval_wav_start_recording(void)
 {
@@ -317,6 +327,10 @@ static void funcval_wav_start_recording(void)
 	wav_write_header(wav_file, 0);
 	wav_sample_count = 0;
 	wav_recording = 1;
+
+	atexit(funcval_wav_stop_recording);
+	signal(SIGINT, sighandler);
+	signal(SIGTERM, sighandler);
 
 	printf("Started WAV recording to %s\n", filename);
 }
@@ -425,7 +439,7 @@ static void funcval_da_audio_callback_wrapper(void *userdata, Uint8 *stream, int
 		da_callback(da_userdata, stream, len);
 	}
 
-	funcval_capture_audio(&da_spec, stream, len, &da_src_pos);
+	//funcval_capture_audio(&da_spec, stream, len, &da_src_pos);
 }
 
 /* SDL_OpenAudio shim for intercepting audio callbacks (p8_audio.c) */
