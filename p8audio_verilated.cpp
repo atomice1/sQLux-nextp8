@@ -42,7 +42,7 @@
 static const int PCM_8X_PER_PCM   = 8;
 
 /* PCM output width — must match p8audio.sv parameter PCM_WID */
-#define PCM_WID 8
+#define PCM_WID 12
 
 /* SDL output configuration */
 static const int SAMPLE_RATE_HW   = 22050;  /* matches clk_pcm */
