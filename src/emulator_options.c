@@ -54,6 +54,7 @@ struct emuOpts emuOptions[] = {
 {"asynctrace", "", "enable async trace output at startup", EMU_OPT_FLAG, 0, NULL},
 {"check_calling_convention", "", "check M68000 calling convention (preserve a2-a7, d2-d7)", EMU_OPT_FLAG, 0, NULL},
 {"exit_on_cpu_disable", "", "exit emulator when CPU is disabled (RESET_REQ = 0xff), default 1", EMU_OPT_INT, 1, NULL},
+{"rom_write_protect", "", "trap writes to ROM area (addr < 32768), default 1", EMU_OPT_INT, 1, NULL},
 #endif
 #ifndef NEXTP8
 {"bdi1", "", "file exposed by the BDI interface", EMU_OPT_CHAR, 0 , NULL},

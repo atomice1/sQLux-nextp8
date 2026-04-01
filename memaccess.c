@@ -22,6 +22,7 @@
 #endif
 
 extern bool asyncTrace;
+extern bool rom_write_protect;
 
 static void log_mem_wr_long(aw32 addr, aw32 d)
 {
@@ -187,7 +188,7 @@ void WriteByte(aw32 addr,aw8 d)
 	Profiler_RecordDataWrite(addr);
 #endif
 
-	if (addr == 0x7ffffe || addr == 0x7fffff || addr < 32768) {
+	if ((addr == 0x7ffffe || addr == 0x7fffff || (addr < 32768 && rom_write_protect))) {
 		printf("\n*** Write to non-writable address 0x%x (value=0x%02x) ***\n", addr, d & 0xff);
 		DbgInfo();
 		exit(1);
@@ -221,7 +222,7 @@ void WriteByte(aw32 addr,aw8 d)
 	if ((addr >= RTOP) && (addr >= qlscreen.qm_hi))
 		return;
 
-	if (addr >= QL_SCREEN_BASE) {
+	if (!rom_write_protect || addr >= QL_SCREEN_BASE) {
 		*((w8 *)memBase + addr) = d;
 		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((d << 8) | d)) & 0xffff);
 	}
@@ -235,7 +236,7 @@ void WriteWord(aw32 addr,aw16 d)
 	Profiler_RecordDataWrite(addr);
 #endif
 
-	if (addr == 0x7ffffe || addr == 0x7fffff || addr < 32768) {
+	if ((addr == 0x7ffffe || addr == 0x7fffff || (addr < 32768 && rom_write_protect))) {
 		printf("\n*** Write to non-writable address 0x%x (value=0x%04x) ***\n", addr, d & 0xffff);
 		DbgInfo();
 		exit(1);
@@ -259,7 +260,7 @@ void WriteWord(aw32 addr,aw16 d)
 	if ((addr >= RTOP) && (addr >= qlscreen.qm_hi))
 		return;
 
-	if (addr >= QL_SCREEN_BASE) {
+	if (!rom_write_protect || addr >= QL_SCREEN_BASE) {
 		WW((Ptr)memBase + addr, d);
 		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)d & 0xffff);
 	}
@@ -273,7 +274,7 @@ void WriteLong(aw32 addr,aw32 d)
 	Profiler_RecordDataWrite(addr);
 #endif
 
-	if (addr == 0x7ffffe || addr == 0x7fffff || addr < 32768) {
+	if ((addr == 0x7ffffe || addr == 0x7fffff || (addr < 32768 && rom_write_protect))) {
 		printf("\n*** Write to non-writable address 0x%x (value=0x%08x) ***\n", addr, d);
 		DbgInfo();
 		exit(1);
@@ -298,7 +299,7 @@ void WriteLong(aw32 addr,aw32 d)
 	if ((addr >= RTOP) && (addr >=qlscreen.qm_hi))
 		return;
 
-	if (addr >= QL_SCREEN_BASE) {
+	if (!rom_write_protect || addr >= QL_SCREEN_BASE) {
 		WL((Ptr)memBase + addr, d);
 		log_mem_wr_long(addr, d);
 	}

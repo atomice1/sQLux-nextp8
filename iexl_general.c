@@ -138,6 +138,7 @@ Cond doTrace;            /* trace after current instruction */
 bool asyncTrace;
 bool check_calling_convention = false;
 bool exit_on_cpu_disable = true;  /* exit emulator when CPU is disabled (RESET_REQ = 0xff) */
+bool rom_write_protect = true;  /* trap writes to ROM (addr < 32768) */
 
 /* Calling convention checking: stack to track saved register state */
 #define CC_STACK_MAX 1024

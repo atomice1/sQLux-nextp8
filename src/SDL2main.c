@@ -31,6 +31,7 @@ extern void DumpState(void);
 extern bool asyncTrace;
 extern bool check_calling_convention;
 extern bool exit_on_cpu_disable;
+extern bool rom_write_protect;
 
 static SDL_Thread *emuThread = NULL;
 
@@ -189,6 +190,12 @@ int main(int argc, char *argv[])
         if (!exit_on_cpu_disable) {
             fprintf(stderr, "Exit on CPU disable disabled (from command line)\n");
         }
+    }
+
+    // Check rom_write_protect option
+    rom_write_protect = (emulatorOptionInt("rom_write_protect") != 0);
+    if (!rom_write_protect) {
+        fprintf(stderr, "ROM write protection disabled (from command line)\n");
     }
 
     // Enable asyncTrace if requested
