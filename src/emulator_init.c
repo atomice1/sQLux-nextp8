@@ -118,6 +118,14 @@ void emulatorInit()
 		exit(1);
 	}
 
+	/* Initialise CPU model before building instruction table */
+	{
+		const char *cpu_model = emulatorOptionString("cpu");
+		cpu68010 = cpu_model && strcmp(cpu_model, "68010") != 0;
+		if (V1)
+			printf("CPU model: %s\n", cpu68010 ? "68010" : "68000");
+	}
+
 	if (EmulatorTable()) {
 		fprintf(stderr, "Failed to allocate instruction table\n");
 		free(memBase);

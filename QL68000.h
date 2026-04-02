@@ -161,6 +161,9 @@ extern w32  displayTo;
 
 extern int isMinerva;
 
+extern int cpu68010; /* 1 = 68010 mode, 0 = 68000 mode */
+extern w32 vbr;      /* Vector Base Register (68010+) */
+
 #ifndef vml
 #define vml static
 #endif

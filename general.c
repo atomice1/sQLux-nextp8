@@ -158,6 +158,7 @@ static uint8_t esp_data_latch = 0;
 static uint8_t esp_ctrl_prev = 0;
 static uint16_t debug_reg_hi = 0;
 static uint16_t debug_reg_lo = 0;
+static uint8_t last_post_code = 0;
 
 void UART_TickAndReceive(int cycles)
 {
@@ -308,7 +309,8 @@ void WriteHWByte(aw32 addr, aw8 d)
 	switch (addr) {
 #ifdef NEXTP8
 	case _POST_CODE:
-		printf("POST: %u\n", d);
+		printf("POST: %u [pc=0x%lx]\n", d, (unsigned long)((Ptr)pc - (Ptr)memBase - 2));
+		last_post_code = d;
 		break;
 	case _VFRONTREQ:
 		//printf("VFRONTREQ: %d\n", d);
@@ -370,7 +372,7 @@ void WriteHWByte(aw32 addr, aw8 d)
 		overlay_control = d;
 		break;
 	case _RESET_REQ:
-		printf("RESET_REQ: 0x%02x\n", d & 0xff);
+		printf("RESET_REQ: 0x%02x [pc=0x%lx]\n", d & 0xff, (unsigned long)((Ptr)pc - (Ptr)memBase - 2));
 		if ((d & 0xff) == 0xff) {
 			extern bool exit_on_cpu_disable;
 			if (exit_on_cpu_disable) {
@@ -760,7 +762,7 @@ void WriteHWWord(aw32 addr, aw16 d)
 		!(addr >= _PALETTE_BASE && addr < _PALETTE_BASE + _PALETTE_SIZE * 2) &&
 		!(addr >= _KEYBOARD_MATRIX_LATCHED && addr < _KEYBOARD_MATRIX_LATCHED + 0x20) &&
 		addr != _JOYSTICK0_LATCHED && addr != _JOYSTICK1_LATCHED && addr != _MOUSE_BUTTONS_LATCHED)
-		printf("WriteHWWord at 0x%lx val=0x%x\n", (unsigned long) addr, ((unsigned) d) & 0xffff);
+		printf("WriteHWWord at 0x%lx val=0x%x [pc=0x%lx]\n", (unsigned long) addr, ((unsigned) d) & 0xffff, (unsigned long)((Ptr)pc - (Ptr)memBase - 2));
 	switch (addr) {
 #ifdef NEXTP8
 	case _DA_CONTROL:

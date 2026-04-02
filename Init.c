@@ -301,6 +301,10 @@ void rol_m(void);
 void code1010(void);
 void code1111(void);
 void InvalidCode(void);
+void move_from_ccr(void);
+void movec(void);
+void rtd(void);
+extern int cpu68010;
 #endif  /* IE_XL */
 
 #ifdef IE_XL
@@ -682,6 +686,14 @@ static void SetTabEntries(void (**itable)(void))
         SetTable(itable, "1110011111xxxxxx", LR rol_m);
         SetTable(itable, "1010xxxxxxxxxxxx", LR code1010);
         SetTable(itable, "1111xxxxxxxxxxxx", LR code1111);
+
+        /* 68010-specific instructions */
+        if (cpu68010) {
+                SetTable(itable, "0100001011xxxxxx", LR move_from_ccr); /* MOVE from CCR */
+                SetTable(itable, "0100111001111010", LR movec);          /* MOVEC Rc,Rn */
+                SetTable(itable, "0100111001111011", LR movec);          /* MOVEC Rn,Rc */
+                SetTable(itable, "0100111001110100", LR rtd);            /* RTD */
+        }
 }
 #endif
 

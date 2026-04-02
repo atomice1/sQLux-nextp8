@@ -1864,6 +1864,14 @@ void move_to_sr(void)
 
 void move_from_sr(void)
 {
+	if (cpu68010 && !supervisor) {
+		/* MOVE from SR is privileged on 68010 */
+		exception = 8;
+		extraFlag = true;
+		nInst2 = nInst;
+		nInst = 0;
+		return;
+	}
 	ARCALL(PutToEA_w, (code >> 3) & 7, code & 7, GetSR());
 	/*PUT_TOEA_W((code>>3)&7,code&7,GetSR());*/
 }
@@ -2454,6 +2462,76 @@ void code1111(void)
 	nInst2 = nInst;
 	nInst = 0;
 #endif
+}
+
+/* -----------------------------------------------------------------------
+ * 68010-specific instructions
+ * ----------------------------------------------------------------------- */
+
+/* MOVE from CCR (0x42C0-0x42FF): unprivileged read of CCR (SR bits 4-0) */
+void move_from_ccr(void)
+{
+	ARCALL(PutToEA_w, (code >> 3) & 7, code & 7, GetSR() & 0x001F);
+}
+
+/* MOVEC (0x4E7A / 0x4E7B): privileged move to/from control register */
+void movec(void)
+{
+	w16 ext;
+	int reg_num, ctrl_reg;
+	w32 val;
+
+	if (!supervisor) {
+		exception = 8;
+		extraFlag = true;
+		nInst2 = nInst;
+		nInst = 0;
+		return;
+	}
+	ext = (w16)RW_PC(pc++);
+	reg_num  = (ext >> 12) & 0xF;
+	ctrl_reg = ext & 0xFFF;
+
+	if (!(code & 1)) {
+		/* MOVEC Rc,Rn — read control register into general register */
+		switch (ctrl_reg) {
+		case 0x000: val = 0;   break; /* SFC */
+		case 0x001: val = 0;   break; /* DFC */
+		case 0x800: val = usp; break; /* USP */
+		case 0x801: val = vbr; break; /* VBR */
+		default:
+			exception = 4;
+			extraFlag = true;
+			nInst2 = nInst;
+			nInst = 0;
+			return;
+		}
+		reg[reg_num] = val;
+	} else {
+		/* MOVEC Rn,Rc — write general register into control register */
+		val = reg[reg_num];
+		switch (ctrl_reg) {
+		case 0x000: break;            /* SFC — not simulated */
+		case 0x001: break;            /* DFC — not simulated */
+		case 0x800: usp = val; break; /* USP */
+		case 0x801: vbr = val; break; /* VBR */
+		default:
+			exception = 4;
+			extraFlag = true;
+			nInst2 = nInst;
+			nInst = 0;
+			return;
+		}
+	}
+}
+
+/* RTD (0x4E74): return and deallocate
+ * Pops return address from stack, then adds signed displacement to SP. */
+void rtd(void)
+{
+	w16 disp = (w16)RW_PC(pc++);
+	SetPC(ReadLong(*m68k_sp));
+	(*m68k_sp) += 4 + disp;
 }
 
 void InvalidCode(void)

@@ -105,7 +105,17 @@ void rte(void)
 #else
 		SetPC(ReadLong((*m68k_sp) + 2));
 #endif
-		(*m68k_sp) += 6;
+		if (cpu68010) {
+			/* consume format/vector word; handle format $2 (6-word frame) */
+			w16 fmt = ReadWord((*m68k_sp) + 6);
+			(*m68k_sp) += 8;
+			if ((fmt >> 12) == 2) {
+				/* format $2: skip instruction address long word */
+				(*m68k_sp) += 4;
+			}
+		} else {
+			(*m68k_sp) += 6;
+		}
 		ExceptionOut();
 		PutSR(sr);
 
@@ -251,13 +261,12 @@ void sf(void)
 
 void stop(void)
 {
-	uw16 imm = (w16)RW_PC(pc++);
-	printf("stop #0x%x\n", (unsigned)imm);
-	DumpState();
 	pc++;
-	imm = RW(pc - 1);
+	uw16 imm = RW_PC(pc - 1);
+	//printf("stop #0x%x\n", (unsigned)imm);
+	//DumpState();
 	if (supervisor) {
-		PutSR(RW(pc - 1));
+		PutSR(imm);
 		if (exception == 0) /* to avoid mess with interrupts */
 		{
 			if (supervisor) {

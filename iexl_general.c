@@ -6,6 +6,16 @@
 
 #include "QL68000.h"
 #include "debug.h"
+
+/* Log every supervisor-bit transition together with the current PC. */
+#define LOG_SUPERVISOR_CHANGE(old, new, reason) \
+    do { \
+        if ((old) != (new)) \
+            printf("supervisor: %s -> %s at PC=0x%08x (%s)\n", \
+                   (old) ? "super" : "user", \
+                   (new) ? "super" : "user", \
+                   (w32)((void*)pc-(void*)memBase), (reason)); \
+    } while(0)
 #include "SDL2screen.h"
 #include "memaccess.h"
 #include "mmodes.h"
@@ -16,6 +26,9 @@
 #endif
 
 void    (**qlux_table)(void);
+
+int cpu68010 = 1;  /* 68010 mode by default */
+w32  vbr = 0;      /* Vector Base Register (68010+) */
 
 #ifdef DEBUG
 //int trace_rts=0;
@@ -238,12 +251,20 @@ void ProcessInterrupts(void)
 	  (*m68k_sp)=ssp;
 	}
       ExceptionIn(24+pendingInterrupt);
-      WriteLong((*m68k_sp)-4,(Ptr)pc-(Ptr)memBase);
-      (*m68k_sp)-=6;
-      WriteWord(*m68k_sp,GetSR());
+      if (cpu68010) {
+        (*m68k_sp)-=8;
+        WriteWord((*m68k_sp)+6, (w16)(((24+pendingInterrupt)*4) & 0x0FFF)); /* format $0 */
+        WriteLong((*m68k_sp)+2,(uintptr_t)pc-(uintptr_t)memBase);
+        WriteWord((*m68k_sp),GetSR());
+      } else {
+        WriteLong((*m68k_sp)-4,(Ptr)pc-(Ptr)memBase);
+        (*m68k_sp)-=6;
+        WriteWord(*m68k_sp,GetSR());
+      }
       SetPCX(24+pendingInterrupt);
       iMask=pendingInterrupt;
       pendingInterrupt=0;
+      LOG_SUPERVISOR_CHANGE(supervisor, true, "interrupt");
       supervisor=true;
       trace=false;
       stopped=false;
@@ -276,6 +297,7 @@ void REGP1 PutSR(aw16 sr)
       nInst2=nInst;
       nInst=0;
     }
+  LOG_SUPERVISOR_CHANGE(supervisor, (sr&0x2000)!=0, "interrupt");
   supervisor=(sr&0x2000)!=0;
   xflag=(sr&0x0010)!=0;
   negative=(sr&0x0008)!=0;
@@ -312,7 +334,10 @@ void REGP1 SetPCX(int i)
   Ptr p=pc;
 #endif
 
-  pc=(uw16*)((Ptr)memBase+(RL(&memBase[i])&ADDR_MASK));
+  if (cpu68010)
+    pc=(uw16*)((Ptr)memBase+(RL((w32*)((Ptr)memBase+vbr)+i)&ADDR_MASK));
+  else
+    pc=(uw16*)((Ptr)memBase+(RL(&memBase[i])&ADDR_MASK));
 
 #ifdef TRACE
   CheckTrace();
@@ -473,9 +498,16 @@ void ExceptionProcessing()
 	  (*m68k_sp)=ssp;
 	}
       ExceptionIn(exception);
-      (*m68k_sp)-=6;
-      WriteLong((*m68k_sp)+2,(uintptr_t)pc-(uintptr_t)memBase);
-      WriteWord((*m68k_sp),GetSR());
+      if (cpu68010 && exception != 3) {
+        (*m68k_sp)-=8;
+        WriteWord((*m68k_sp)+6, (w16)((exception*4) & 0x0FFF)); /* format $0 */
+        WriteLong((*m68k_sp)+2,(uintptr_t)pc-(uintptr_t)memBase);
+        WriteWord((*m68k_sp),GetSR());
+      } else {
+        (*m68k_sp)-=6;
+        WriteLong((*m68k_sp)+2,(uintptr_t)pc-(uintptr_t)memBase);
+        WriteWord((*m68k_sp),GetSR());
+      }
       SetPCX(exception);
       if(exception==3) /* address error */
 	{
@@ -487,6 +519,7 @@ void ExceptionProcessing()
 	  if(nInst) exception=0;
 	} else exception=0; /* allow interrupts */
       extraFlag=false;
+      LOG_SUPERVISOR_CHANGE(supervisor, true, "exception");
       supervisor=true;
       trace=false;
     }
@@ -498,11 +531,19 @@ void ExceptionProcessing()
 	  (*m68k_sp)=ssp;
 	}
       ExceptionIn(9);
-      (*m68k_sp)-=6;
-      WriteLong((*m68k_sp)+2,(Ptr)pc-(Ptr)memBase);
-      WriteWord((*m68k_sp),GetSR());
+      if (cpu68010) {
+        (*m68k_sp)-=8;
+        WriteWord((*m68k_sp)+6, (w16)((9*4) & 0x0FFF)); /* format $0, trace vector */
+        WriteLong((*m68k_sp)+2,(uintptr_t)pc-(uintptr_t)memBase);
+        WriteWord((*m68k_sp),GetSR());
+      } else {
+        (*m68k_sp)-=6;
+        WriteLong((*m68k_sp)+2,(Ptr)pc-(Ptr)memBase);
+        WriteWord((*m68k_sp),GetSR());
+      }
       SetPCX(9);
       if(nInst==0) exception=9;       /* no interrupt allowed here */
+      LOG_SUPERVISOR_CHANGE(supervisor, true, "trace exception");
       supervisor=true;
       /*doTrace=*/trace=false;
       extraFlag=false;
@@ -646,6 +687,7 @@ void ExecuteChunk(long n)       /* execute n emulated 68K istructions */
 
 void InitialSetup(void) /* 68K state when powered on */
 {
+  vbr = 0;   /* VBR reset to 0 */
   ssp=*m68k_sp=RL(&memBase[0]);
   SetPC(RL(&memBase[1]));
   if(V3)printf("initial PC=%x SP=%x\n",(w32)((void*)pc-(void*)memBase),ssp);

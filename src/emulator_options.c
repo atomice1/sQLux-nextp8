@@ -62,6 +62,7 @@ struct emuOpts emuOptions[] = {
 {"boot_device", "d", "device to load BOOT file from", EMU_OPT_CHAR, 0, "mdv1"},
 #endif
 {"cart", "", "p8 cart", EMU_OPT_CHAR, 0, NULL},
+{"cpu", "", "CPU model: 68000 or 68010 (default: 68000)", EMU_OPT_CHAR, 0, "68000"},
 #ifdef NEXTP8
 {"exit_action", "", "0 = restart on exit, 1 = shutdown on exit", EMU_OPT_INT, 0, NULL},
 #else
