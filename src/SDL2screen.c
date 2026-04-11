@@ -1194,6 +1194,7 @@ static struct SDLQLMap sdlqlmap_default[] = {
 	{ SDLK_SEMICOLON, 0x4C },  // ; :
 	{ SDLK_QUOTE, 0x52 },      // ' "
 	{ SDLK_RETURN, 0x5A },
+	{ SDLK_HASH, 0x5D },       // UK # ~
 
 	// Bottom letter row
 	{ SDLK_LSHIFT, 0x12 },
