@@ -374,6 +374,9 @@ void WriteHWByte(aw32 addr, aw8 d)
 	case _SCREEN_TRANSFORM:
 		screen_transform = d;
 		break;
+	case _HIGH_COLOUR_MODE:
+		high_colour_mode = d;
+		break;
 	case _RESET_REQ:
 		printf("RESET_REQ: 0x%02x [pc=0x%lx]\n", d & 0xff, (unsigned long)((Ptr)pc - (Ptr)memBase - 2));
 		if ((d & 0xff) == 0xff) {
@@ -465,6 +468,14 @@ void WriteHWByte(aw32 addr, aw8 d)
 			screenPalette[bank][addr & 0x0F] = d;
 			return;
 		}
+		if (addr >= _SECONDARY_PALETTE_BASE && addr < _SECONDARY_PALETTE_BASE + _PALETTE_SIZE) {
+			secondaryPalette[1 - vfront][addr - _SECONDARY_PALETTE_BASE] = d;
+			return;
+		}
+		if (addr >= _HIGH_COLOUR_BITFIELD_BASE && addr < _HIGH_COLOUR_BITFIELD_BASE + _PALETTE_SIZE) {
+			highColourBitfield[1 - vfront][addr - _HIGH_COLOUR_BITFIELD_BASE] = d;
+			return;
+		}
 		if (addr >= _KEYBOARD_MATRIX_LATCHED &&
 			addr < _KEYBOARD_MATRIX_LATCHED + 0x20) {
 			sdl_keyrow_latched[addr - _KEYBOARD_MATRIX_LATCHED] &= ~d;
@@ -552,6 +563,8 @@ rw8 ReadHWByte(aw32 addr)
 		return overlay_control;
 	case _SCREEN_TRANSFORM:
 		return screen_transform;
+	case _HIGH_COLOUR_MODE:
+		return high_colour_mode;
 	case _JOYSTICK0:
 		return joy_state[0];
 	case _JOYSTICK1:
@@ -649,6 +662,10 @@ rw8 ReadHWByte(aw32 addr)
 			int bank = (addr & 0x10) ? vfront : (1 - vfront);
 			return screenPalette[bank][addr & 0x0F] & 0xff;
 		}
+		if (addr >= _SECONDARY_PALETTE_BASE && addr < _SECONDARY_PALETTE_BASE + _PALETTE_SIZE)
+			return secondaryPalette[1 - vfront][addr - _SECONDARY_PALETTE_BASE] & 0xff;
+		if (addr >= _HIGH_COLOUR_BITFIELD_BASE && addr < _HIGH_COLOUR_BITFIELD_BASE + _PALETTE_SIZE)
+			return highColourBitfield[1 - vfront][addr - _HIGH_COLOUR_BITFIELD_BASE] & 0xff;
 		if (addr >= _P8AUDIO_BASE && addr < _P8AUDIO_BASE + 0x100) {
 			if (addr >= _P8AUDIO_STAT46 && addr <= _P8AUDIO_STAT57 + 1) {
 				uint16_t w = p8audio_verilated_mmio_read(

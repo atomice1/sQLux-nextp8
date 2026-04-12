@@ -29,6 +29,9 @@ int vfront = 0, vfrontreq = 0;
 uint8_t overlay_control = 0;  // [3:0] transparent index, [6] enable
 uint8_t vblank_intr_enable = 0;  // VBLANK interrupt enable (bit 0)
 uint8_t screen_transform = 0;   // screen transform mode (0x5f2c mirror)
+uint8_t high_colour_mode = 0;   // high-colour mode (0x5f5f mirror)
+uint8_t secondaryPalette[2][16]; // double-buffered secondary palette
+uint8_t highColourBitfield[2][16]; // double-buffered per-line palette bitfield
 #endif
 
 struct SCREENDEF

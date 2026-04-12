@@ -27,4 +27,7 @@ extern int vfront, vfrontreq;
 extern uint8_t overlay_control;
 extern uint8_t vblank_intr_enable;
 extern uint8_t screen_transform;
+extern uint8_t high_colour_mode;
+extern uint8_t secondaryPalette[2][16];
+extern uint8_t highColourBitfield[2][16];
 #endif

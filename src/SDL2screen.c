@@ -647,6 +647,45 @@ static inline void screen_transform_pixel(uint8_t mode, int ox, int oy, int *sx,
         break;
     }
 }
+
+// Resolve the 8-bit extended color for a pixel, considering high-color mode.
+// pix_index: raw 4-bit framebuffer pixel, sx/sy: source coordinates.
+static inline uint8_t high_color_resolve(uint8_t pix_index, int sx, int sy)
+{
+	uint8_t hc = high_colour_mode;
+	if (hc == 0x10) {
+		// Per-line palette swap via bitfield
+		uint8_t bf = highColourBitfield[vfront][sy >> 3];
+		if (bf & (1 << (sy & 7)))
+			return secondaryPalette[vfront][pix_index];
+		return screenPalette[vfront][pix_index];
+	}
+	if (hc == 0x20) {
+		// 5-bitplane mode: if hidden right-half pixel is non-zero, use secondary
+		int hidden_byte_offset = ((sx + 64) >> 1) + sy * 64;
+		if (hidden_byte_offset >= 0 && hidden_byte_offset < _FRAME_BUFFER_SIZE) {
+			uint8_t hidden_byte = ((uint8_t *)&frameBuffer[vfront])[hidden_byte_offset];
+			uint8_t hidden_pix = ((sx + 64) & 1) ? (hidden_byte >> 4) : (hidden_byte & 0xf);
+			if (hidden_pix != 0)
+				return secondaryPalette[vfront][pix_index];
+		}
+		return screenPalette[vfront][pix_index];
+	}
+	if ((hc & 0xf0) == 0x30) {
+		// Gradient fill: replace color n with per-section secondary palette color
+		uint8_t replace_color = hc & 0x0f;
+		uint8_t screen_color = screenPalette[vfront][pix_index];
+		if ((screen_color & 0x0f) == replace_color) {
+			int section = sy >> 3;
+			uint8_t bf = highColourBitfield[vfront][sy >> 3];
+			if (bf & (1 << (sy & 7)))
+				section = (section + 1) & 0x0f;
+			return secondaryPalette[vfront][section];
+		}
+		return screen_color;
+	}
+	return screenPalette[vfront][pix_index];
+}
 #endif
 
 static void emulatorUpdatePixelBufferQL(uint32_t *pixelPtr32,
@@ -673,7 +712,12 @@ static void emulatorUpdatePixelBufferQL(uint32_t *pixelPtr32,
 			int src_byte_offset = (sx >> 1) + sy * 64;
 			uint8_t src_byte = ((uint8_t *)&frameBuffer[vfront])[src_byte_offset];
 			uint8_t pix_index = (sx & 1) ? (src_byte >> 4) : (src_byte & 0xf);
-			uint32_t colour = SDLcolors[color_index(screenPalette[vfront][pix_index])];
+			uint8_t pal_val;
+			if (high_colour_mode != 0)
+				pal_val = high_color_resolve(pix_index, sx, sy);
+			else
+				pal_val = screenPalette[vfront][pix_index];
+			uint32_t colour = SDLcolors[color_index(pal_val)];
 
 			if (overlay_control & _OVERLAY_ENABLE_BIT) {
 				int overlay_byte_offset = (ox >> 1) + oy * 64;
