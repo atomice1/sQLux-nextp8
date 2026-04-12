@@ -598,6 +598,55 @@ static inline int color_index(uint8_t c)
 {
     return ((c >> 3) & 0x10) | (c & 0xf);
 }
+
+// Map output pixel (ox, oy) to source framebuffer pixel (sx, sy) based on
+// the screen transform mode written to _SCREEN_TRANSFORM (0x8000a1).
+static inline void screen_transform_pixel(uint8_t mode, int ox, int oy, int *sx, int *sy)
+{
+    switch (mode) {
+    default:
+    case 0: // normal
+        *sx = ox; *sy = oy;
+        break;
+    case 1: // horizontal stretch: 64x128 → 128x128
+        *sx = ox >> 1; *sy = oy;
+        break;
+    case 2: // vertical stretch: 128x64 → 128x128
+        *sx = ox; *sy = oy >> 1;
+        break;
+    case 3: // both stretch: 64x64 → 128x128
+        *sx = ox >> 1; *sy = oy >> 1;
+        break;
+    case 5: // horizontal mirror: left half mirrored to right
+        *sx = (ox < 64) ? ox : (127 - ox); *sy = oy;
+        break;
+    case 6: // vertical mirror: top half mirrored to bottom
+        *sx = ox; *sy = (oy < 64) ? oy : (127 - oy);
+        break;
+    case 7: // both mirror: top-left quarter mirrored to all
+        *sx = (ox < 64) ? ox : (127 - ox);
+        *sy = (oy < 64) ? oy : (127 - oy);
+        break;
+    case 129: // horizontal flip
+        *sx = 127 - ox; *sy = oy;
+        break;
+    case 130: // vertical flip
+        *sx = ox; *sy = 127 - oy;
+        break;
+    case 131: // both flip (180 degree rotation)
+        *sx = 127 - ox; *sy = 127 - oy;
+        break;
+    case 133: // clockwise 90 degree rotation
+        *sx = 127 - oy; *sy = ox;
+        break;
+    case 134: // 180 degree rotation
+        *sx = 127 - ox; *sy = 127 - oy;
+        break;
+    case 135: // counterclockwise 90 degree rotation
+        *sx = oy; *sy = 127 - ox;
+        break;
+    }
+}
 #endif
 
 static void emulatorUpdatePixelBufferQL(uint32_t *pixelPtr32,
@@ -610,30 +659,35 @@ static void emulatorUpdatePixelBufferQL(uint32_t *pixelPtr32,
 
 	while (emulatorScreenPtr < emulatorScreenPtrEnd) {
 #ifdef NEXTP8
-		uint8_t t = *emulatorScreenPtr++;
-		uint8_t lo_index = t & 0xf;
-		uint8_t hi_index = (t >> 4) & 0xf;
-		uint32_t lo_colour = SDLcolors[color_index(screenPalette[vfront][lo_index])];
-		uint32_t hi_colour = SDLcolors[color_index(screenPalette[vfront][hi_index])];
+		int byte_offset = emulatorScreenPtr - (uint8_t *)&frameBuffer[vfront];
+		int ox_base = (byte_offset % 64) * 2;
+		int oy = byte_offset / 64;
 
-		if (overlay_control & _OVERLAY_ENABLE_BIT) {
-			int overlay_offset = (emulatorScreenPtr - 1 - (uint8_t *)&frameBuffer[vfront]);
-			if (overlay_offset >= 0 && overlay_offset < _FRAME_BUFFER_SIZE) {
-				uint8_t overlay_byte = overlayBuffer[vfront][overlay_offset];
-				uint8_t overlay_lo_index = overlay_byte & 0xf;
-				uint8_t overlay_hi_index = (overlay_byte >> 4) & 0xf;
-				uint8_t transparent_index = overlay_control & 0xf;
+		emulatorScreenPtr++;
 
-				if (overlay_lo_index != transparent_index)
-					lo_colour = SDLcolors[color_index(overlay_lo_index)];
+		for (int sub = 0; sub < 2; sub++) {
+			int ox = ox_base + sub;
+			int sx, sy;
+			screen_transform_pixel(screen_transform, ox, oy, &sx, &sy);
 
-				if (overlay_hi_index != transparent_index)
-					hi_colour = SDLcolors[color_index(overlay_hi_index)];
+			int src_byte_offset = (sx >> 1) + sy * 64;
+			uint8_t src_byte = ((uint8_t *)&frameBuffer[vfront])[src_byte_offset];
+			uint8_t pix_index = (sx & 1) ? (src_byte >> 4) : (src_byte & 0xf);
+			uint32_t colour = SDLcolors[color_index(screenPalette[vfront][pix_index])];
+
+			if (overlay_control & _OVERLAY_ENABLE_BIT) {
+				int overlay_byte_offset = (ox >> 1) + oy * 64;
+				if (overlay_byte_offset >= 0 && overlay_byte_offset < _FRAME_BUFFER_SIZE) {
+					uint8_t overlay_byte = overlayBuffer[vfront][overlay_byte_offset];
+					uint8_t overlay_index = (ox & 1) ? (overlay_byte >> 4) : (overlay_byte & 0xf);
+					uint8_t transparent_index = overlay_control & 0xf;
+					if (overlay_index != transparent_index)
+						colour = SDLcolors[color_index(overlay_index)];
+				}
 			}
-		}
 
-		*pixelPtr32++ = lo_colour;
-		*pixelPtr32++ = hi_colour;
+			pixelPtr32[ox + oy * 128] = colour;
+		}
 #else
 		uint8_t t1 = *emulatorScreenPtr++;
 		uint8_t t2 = *emulatorScreenPtr++;

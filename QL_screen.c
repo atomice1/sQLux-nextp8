@@ -28,6 +28,7 @@ uint8_t screenPalette[2][16] = {
 int vfront = 0, vfrontreq = 0;
 uint8_t overlay_control = 0;  // [3:0] transparent index, [6] enable
 uint8_t vblank_intr_enable = 0;  // VBLANK interrupt enable (bit 0)
+uint8_t screen_transform = 0;   // screen transform mode (0x5f2c mirror)
 #endif
 
 struct SCREENDEF

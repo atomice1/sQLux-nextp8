@@ -371,6 +371,9 @@ void WriteHWByte(aw32 addr, aw8 d)
 	case _OVERLAY_CONTROL:
 		overlay_control = d;
 		break;
+	case _SCREEN_TRANSFORM:
+		screen_transform = d;
+		break;
 	case _RESET_REQ:
 		printf("RESET_REQ: 0x%02x [pc=0x%lx]\n", d & 0xff, (unsigned long)((Ptr)pc - (Ptr)memBase - 2));
 		if ((d & 0xff) == 0xff) {
@@ -547,6 +550,8 @@ rw8 ReadHWByte(aw32 addr)
 		return i2c_rtc_read_status();
 	case _OVERLAY_CONTROL:
 		return overlay_control;
+	case _SCREEN_TRANSFORM:
+		return screen_transform;
 	case _JOYSTICK0:
 		return joy_state[0];
 	case _JOYSTICK1:

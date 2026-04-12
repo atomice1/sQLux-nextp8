@@ -26,4 +26,5 @@ extern uint8_t screenPalette[2][16]; /* [bank][byte_offset]; bank selected by vf
 extern int vfront, vfrontreq;
 extern uint8_t overlay_control;
 extern uint8_t vblank_intr_enable;
+extern uint8_t screen_transform;
 #endif
