@@ -334,6 +334,8 @@ static void model_reset(void)
 
 static SDL_AudioSpec s_audio_spec;
 static bool          s_model_init = false;
+static pthread_t     s_thread {};
+static volatile bool s_thread_stopping = false;
 
 void p8audio_verilated_init(void)
 {
@@ -361,6 +363,21 @@ void p8audio_verilated_init(void)
     if (ret != 0) {
         fprintf(stderr, "[p8audio_verilated] SDL_OpenAudio failed: %s\n",
                 SDL_GetError());
+        int ret = pthread_create(&s_thread,
+            nullptr,
+            [](void*) -> void* {
+                int16_t *buf = new int16_t[SDL_BUFFER_SAMPLES];
+                while (!s_thread_stopping) {
+                    audio_callback_verilated(nullptr, (uint8_t*)buf, sizeof(int16_t) * SDL_BUFFER_SAMPLES);
+                    SDL_Delay(SDL_BUFFER_SAMPLES * 1000 / SAMPLE_RATE_HW);
+                }
+                delete[] buf;
+                return nullptr;
+            }, nullptr);
+        if (ret != 0) {
+            fprintf(stderr, "[p8audio_verilated] Failed to create fallback audio thread: %s\n",
+                    SDL_GetError());
+        }
         return;
     }
 
@@ -379,7 +396,12 @@ void audio_pause(void)
 
 void audio_close(void)
 {
-    SDL_CloseAudio();
+    if (s_thread != pthread_t{}) {
+        s_thread_stopping = true;
+        pthread_join(s_thread, nullptr);
+    } else {
+        SDL_CloseAudio();
+    }
     if (s_model) {
         s_model->final();
         delete s_model;
