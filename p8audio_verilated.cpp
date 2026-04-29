@@ -323,6 +323,9 @@ static void model_reset(void)
 
     /* Settle after reset deassertion */
     for (int i = 0; i < 4; i++) { tick_mclk(1); tick_mclk(0); }
+
+    /* Populate initial stat cache */
+    update_stat_cache();
 }
 
 /*==============================================================
