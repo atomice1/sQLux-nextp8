@@ -276,7 +276,7 @@ static void funcval_latch_scancode(uint8_t data)
 
 	if (usb_hid_code != 0) {
 		/* Update keyboard matrix */
-		SDLQLKeyrowChg(code, press);
+		SDLQLKeyrowChg(code, press, 0);
 	}
 
 	/* Reset state machine */
@@ -715,7 +715,7 @@ void funcval_write_byte(aw32 addr, aw8 data)
 			int bit_set = (data >> bit) & 1;
 
 			/* Columns are active-low: 0 = pressed, 1 = released */
-			SDLQLKeyrowChg(scancode, bit_set ? 0 : 1);
+			SDLQLKeyrowChg(scancode, bit_set ? 0 : 1, 0);
 
 			if (asyncTrace) {
 				printf("FuncVal KB Matrix: row %d, bit %d, scancode 0x%02X -> code 0x%02X, %s\n",

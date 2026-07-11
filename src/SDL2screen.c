@@ -984,7 +984,56 @@ unsigned int sdl_mouse_buttons = 0;
 unsigned int sdl_mouse_buttons_latched = 0;
 #endif
 
-void SDLQLKeyrowChg(int code, int press)
+#ifdef NEXTP8
+enum { MAX_KEY_EVENTS = 8 };  // size of circular buffer
+
+uint32_t key_queue_buffer[MAX_KEY_EVENTS]; // note: only (MAX_KEY_EVENTS - 1) elements can be stored at a given time
+int key_queue_write_index = 0;
+int key_queue_read_index  = 0;
+
+void key_queue_push(uint32_t key_event)
+{
+  if ((key_queue_write_index + 1) % MAX_KEY_EVENTS == key_queue_read_index)
+  {
+     // buffer is full, avoid overflow
+     return;
+  }
+  key_queue_buffer[key_queue_write_index] = key_event;
+  key_queue_write_index = (key_queue_write_index + 1) % MAX_KEY_EVENTS;
+}
+
+uint32_t key_queue_pop(void)
+{
+  if (key_queue_read_index == key_queue_write_index)
+  {
+     // buffer is empty
+     return 0;
+  }
+
+  uint32_t ret = key_queue_buffer[key_queue_read_index];
+  key_queue_read_index = (key_queue_read_index + 1) % MAX_KEY_EVENTS;
+  return ret;
+}
+
+uint32_t key_queue_peek(void)
+{
+  if (key_queue_read_index == key_queue_write_index)
+  {
+     // buffer is empty
+     return 0;
+  }
+
+  uint32_t ret = key_queue_buffer[key_queue_read_index];
+  return ret;
+}
+
+void key_queue_clear(void)
+{
+	key_queue_read_index = key_queue_write_index;
+}
+#endif
+
+void SDLQLKeyrowChg(int code, int press, unsigned keymod)
 {
 	code &= 0xff; // Make sure that array bounds are not exceeded
 #ifdef NEXTP8
@@ -994,13 +1043,35 @@ void SDLQLKeyrowChg(int code, int press)
 #endif
 	int col = 0x1 << (code % 8);
 
+	int keymod_nextp8 = 0;
+	if (keymod & KMOD_LSHIFT)
+		keymod_nextp8 |= 1;
+	if (keymod & KMOD_RSHIFT)
+		keymod_nextp8 |= 2;
+	if (keymod & KMOD_LCTRL)
+		keymod_nextp8 |= 4;
+	if (keymod & KMOD_RCTRL)
+		keymod_nextp8 |= 8;
+	if (keymod & KMOD_LALT)
+		keymod_nextp8 |= 16;
+	if (keymod & KMOD_RALT)
+		keymod_nextp8 |= 32;
+	if (keymod & KMOD_LGUI)
+		keymod_nextp8 |= 64;
+	if (keymod & KMOD_RGUI)
+		keymod_nextp8 |= 128;
+
 	if (press) {
 #ifdef NEXTP8
-		if (!(sdl_keyrow[row] & col))
+		if (!(sdl_keyrow[row] & col)) {
 			sdl_keyrow_latched[row] |= col;
+			key_queue_push(code | (keymod_nextp8 << 16));
+		}
 #endif
 		sdl_keyrow[row] |= col;
 	} else {
+		if (sdl_keyrow[row] & col)
+			key_queue_push(code | (keymod_nextp8 << 16) | UINT32_C(0x80000000));
 		sdl_keyrow[row] &= ~col;
 	}
 }
@@ -1805,7 +1876,7 @@ void QLSDProcessKey(SDL_Keysym *keysym, int pressed)
 
 #ifdef NEXTP8
 	if (keysym->scancode < 256)
-		SDLQLKeyrowChg(keysym->scancode, pressed);
+		SDLQLKeyrowChg(keysym->scancode, pressed, keysym->mod);
 #else
 	// Reset the search
 	i = 0;

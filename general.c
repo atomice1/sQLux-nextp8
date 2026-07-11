@@ -752,6 +752,10 @@ rw16 ReadHWWord(aw32 addr)
 		return debug_reg_hi;
 	case _DEBUG_REG_LO:
 		return debug_reg_lo;
+	case _KEYBOARD_EVENT_QUEUE_HI:
+		return key_queue_peek() >> 16;
+	case _KEYBOARD_EVENT_QUEUE_LO:
+		return key_queue_pop() & 0xffff;
 #else
 	case 0x018108:
 		return SQLUXBDISizeHigh();
@@ -818,6 +822,9 @@ void WriteHWWord(aw32 addr, aw16 d)
 		break;
 	case _DEBUG_REG_LO:
 		debug_reg_lo = d;
+		break;
+	case _KEYBOARD_EVENT_QUEUE_LO:
+		key_queue_clear();
 		break;
 #else
 	case 0x018104:

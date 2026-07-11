@@ -72,7 +72,10 @@ rw8 ReadByte(aw32 addr)
 	if (is_hw(addr)) {
 		result = ReadHWByte(addr);
 		if (asyncTrace) {
-			printf("MEM RD: addr=0x%x data=0x%x\n", addr, (unsigned)(((result << 8) | result)) & 0xffff);
+			if (addr & 1)
+				printf("MEM RD: addr=0x%x data=0xzz%02x\n", addr, (unsigned)result & 0xff);
+			else
+				printf("MEM RD: addr=0x%x data=0x%02xzz\n", addr, (unsigned)result & 0xff);
 		}
 		return result;
 	}
@@ -196,11 +199,11 @@ void WriteByte(aw32 addr,aw8 d)
 
 	if (addr == 0xfffffe) {
 		write(1, &d, 1);
-		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((d << 8) | d)) & 0xffff);
+		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((((unsigned)d & 0xff) << 8) | ((unsigned)d & 0xff))) & 0xffff);
 		return;
 	} else if (addr == 0xffffff) {
 		write(2, &d, 1);
-		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((d << 8) | d)) & 0xffff);
+		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((((unsigned)d & 0xff) << 8) | ((unsigned)d & 0xff))) & 0xffff);
 		return;
 	}
 
@@ -208,14 +211,14 @@ void WriteByte(aw32 addr,aw8 d)
 	/* Check for FuncVal testbench access (3MB-4MB range) */
 	if (funcval_mode && funcval_is_testbench_addr(addr)) {
 		funcval_write_byte(addr, d);
-		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((d << 8) | d)) & 0xffff);
+		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((((unsigned)d & 0xff) << 8) | ((unsigned)d & 0xff))) & 0xffff);
 		return;
 	}
 #endif
 
 	if (is_hw(addr)) {
 		WriteHWByte(addr, d);
-		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((d << 8) | d)) & 0xffff);
+		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((((unsigned)d & 0xff) << 8) | ((unsigned)d & 0xff))) & 0xffff);
 		return;
 	}
 
@@ -224,7 +227,7 @@ void WriteByte(aw32 addr,aw8 d)
 
 	if (!rom_write_protect || addr >= QL_SCREEN_BASE) {
 		*((w8 *)memBase + addr) = d;
-		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((d << 8) | d)) & 0xffff);
+		if (asyncTrace) printf("MEM WR: addr=0x%x data=0x%x\n", addr, (unsigned)(((((unsigned)d & 0xff) << 8) | ((unsigned)d & 0xff))) & 0xffff);
 	}
 }
 

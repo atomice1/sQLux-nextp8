@@ -30,6 +30,9 @@ extern int16_t sdl_mouse_y_accum;
 extern int16_t sdl_mouse_z_accum;
 extern unsigned int sdl_mouse_buttons;
 extern unsigned int sdl_mouse_buttons_latched;
+uint32_t key_queue_pop(void);
+uint32_t key_queue_peek(void);
+void key_queue_clear(void);
 #else
 extern unsigned int sdl_keyrow[8];
 #endif
@@ -42,7 +45,7 @@ extern bool ql_fullscreen;
 extern double ql_screen_ratio;
 
 /* Keyboard row change function for testbench */
-void SDLQLKeyrowChg(int code, int press);
+void SDLQLKeyrowChg(int code, int press, unsigned keymod);
 
 /* FuncVal testbench functions */
 void QLSDLSaveFuncvalScreenshot(const char *filename);
