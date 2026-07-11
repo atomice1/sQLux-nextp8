@@ -91,90 +91,90 @@ static double da_src_pos = 0.0;
 
 /* Row 0: Caps Shift at [0], Z at [1], X at [2], C at [3], V at [4], Up at [6] */
 static const uint8_t keyboard_matrix_row0_scancode[] = {
-    0x12,  /* [0] - 0x12: Caps Shift */
-    0x1A,  /* [1] - 0x1A: Z */
-    0x22,  /* [2] - 0x22: X */
-    0x21,  /* [3] - 0x21: C */
-    0x2A,  /* [4] - 0x2A: V */
-    0xFF,  /* [5] - reserved */
-    0xF5   /* [6] - 0xF5: Up */
+    0xe1,  /* [0] - Caps Shift */
+    0x1d,  /* [1] - Z */
+    0x1b,  /* [2] - X */
+    0x06,  /* [3] - C */
+    0x19,  /* [4] - V */
+    0xe4,  /* [5] - Extended Mode (Right Shift + Right Ctrl) */
+    0x52   /* [6] - Up */
 };
 
 /* Row 1: A at [0], S at [1], D at [2], F at [3], G at [4], Caps Lock at [5] */
 static const uint8_t keyboard_matrix_row1_scancode[] = {
-    0x1C,  /* [0] - 0x1C: A */
-    0x1B,  /* [1] - 0x1B: S */
-    0x23,  /* [2] - 0x23: D */
-    0x2B,  /* [3] - 0x2B: F */
-    0x34,  /* [4] - 0x34: G */
-    0x58,  /* [5] - 0x58: Caps Lock */
-    0xFF   /* [6] - reserved */
+    0x04,  /* [0] - A */
+    0x16,  /* [1] - S */
+    0x07,  /* [2] - D */
+    0x09,  /* [3] - F */
+    0x0a,  /* [4] - G */
+    0x39,  /* [5] - Caps Lock */
+    0x47   /* [6] - Graph (Scroll Lock) */
 };
 
 /* Row 2: Q at [0], W at [1], E at [2], R at [3], T at [4] */
 static const uint8_t keyboard_matrix_row2_scancode[] = {
-    0x15,  /* [0] - 0x15: Q */
-    0x1D,  /* [1] - 0x1D: W */
-    0x24,  /* [2] - 0x24: E */
-    0x2D,  /* [3] - 0x2D: R */
-    0x2C,  /* [4] - 0x2C: T */
-    0xFF,  /* [5] - reserved */
-    0xFF   /* [6] - reserved */
+    0x14,  /* [0] - Q */
+    0x1a,  /* [1] - W */
+    0x08,  /* [2] - E */
+    0x15,  /* [3] - R */
+    0x17,  /* [4] - T */
+    0x4b,  /* [5] - True Video (Page Up) */
+    0x4e   /* [6] - Inv Video (Page Down) */
 };
 
 /* Row 3: 1 at [0], 2 at [1], 3 at [2], 4 at [3], 5 at [4], Break/ESC at [5] */
 static const uint8_t keyboard_matrix_row3_scancode[] = {
-    0x16,  /* [0] - 0x16: 1 */
-    0x1E,  /* [1] - 0x1E: 2 */
-    0x26,  /* [2] - 0x26: 3 */
-    0x25,  /* [3] - 0x25: 4 */
-    0x2E,  /* [4] - 0x2E: 5 */
-    0x76,  /* [5] - 0x76: Break (ESC) */
-    0xFF   /* [6] - reserved */
+    0x1e,  /* [0] - 1 */
+    0x1f,  /* [1] - 2 */
+    0x20,  /* [2] - 3 */
+    0x21,  /* [3] - 4 */
+    0x22,  /* [4] - 5 */
+    0x29,  /* [5] - Break (ESC) */
+    0x39   /* [6] - Edit (Caps Lock) */
 };
 
 /* Row 4: 0 at [0], 9 at [1], 8 at [2], 7 at [3], 6 at [4], ; at [5], " at [6] */
 static const uint8_t keyboard_matrix_row4_scancode[] = {
-    0x45,  /* [0] - 0x45: 0 */
-    0x46,  /* [1] - 0x46: 9 */
-    0x3E,  /* [2] - 0x3E: 8 */
-    0x3D,  /* [3] - 0x3D: 7 */
-    0x36,  /* [4] - 0x36: 6 */
-    0x4C,  /* [5] - 0x4C: ; */
-    0x52   /* [6] - 0x52: " */
+    0x27,  /* [0] - 0 */
+    0x26,  /* [1] - 9 */
+    0x25,  /* [2] - 8 */
+    0x24,  /* [3] - 7 */
+    0x23,  /* [4] - 6 */
+    0x33,  /* [5] - ; */
+    0x34   /* [6] - " */
 };
 
 /* Row 5: P at [0], O at [1], I at [2], U at [3], Y at [4], , at [5], . at [6] */
 static const uint8_t keyboard_matrix_row5_scancode[] = {
-    0x4D,  /* [0] - 0x4D: P */
-    0x44,  /* [1] - 0x44: O */
-    0x43,  /* [2] - 0x43: I */
-    0x3C,  /* [3] - 0x3C: U */
-    0x35,  /* [4] - 0x35: Y */
-    0x41,  /* [5] - 0x41: , */
-    0x49   /* [6] - 0x49: . */
+    0x13,  /* [0] - P */
+    0x12,  /* [1] - O */
+    0x0c,  /* [2] - I */
+    0x18,  /* [3] - U */
+    0x1c,  /* [4] - Y */
+    0x36,  /* [5] - , */
+    0x37   /* [6] - . */
 };
 
 /* Row 6: Enter at [0], L at [1], K at [2], J at [3], H at [4], Delete at [5], Right at [6] */
 static const uint8_t keyboard_matrix_row6_scancode[] = {
-    0x5A,  /* [0] - 0x5A: Enter */
-    0x4B,  /* [1] - 0x4B: L */
-    0x42,  /* [2] - 0x42: K */
-    0x3B,  /* [3] - 0x3B: J */
-    0x33,  /* [4] - 0x33: H */
-    0x71,  /* [5] - 0x71: Delete */
-    0xF4   /* [6] - 0xF4: Right */
+    0x28,  /* [0] - Enter */
+    0x0f,  /* [1] - L */
+    0x0e,  /* [2] - K */
+    0x0d,  /* [3] - J */
+    0x0b,  /* [4] - H */
+    0x2a,  /* [5] - Delete (Backspace) */
+    0x4f   /* [6] - Right*/
 };
 
 /* Row 7: Space at [0], Sym Shift/LAlt at [1], M at [2], N at [3], B at [4], Left at [5], Down at [6] */
 static const uint8_t keyboard_matrix_row7_scancode[] = {
-    0x29,  /* [0] - 0x29: Space */
-    0x11,  /* [1] - 0x11: Sym Shift (LAlt) */
-    0x3A,  /* [2] - 0x3A: M */
-    0x31,  /* [3] - 0x31: N */
-    0x32,  /* [4] - 0x32: B */
-    0xEB,  /* [5] - 0xEB: Left */
-    0xF2   /* [6] - 0xF2: Down */
+    0x2c,  /* [0] - Space */
+    0xe2,  /* [1] - Sym Shift (LAlt) */
+    0x10,  /* [2] - M */
+    0x11,  /* [3] - N */
+    0x05,  /* [4] - B */
+    0x50,  /* [5] - Left */
+    0x51   /* [6] - Down */
 };
 
 /* Array of pointers to each row's scancode mappings */
@@ -215,6 +215,41 @@ static ps2_state_t ps2_state = PS2_STATE_NORMAL;
 #define FUNCVAL_VGA_FB_START    0x390000
 #define FUNCVAL_VGA_FB_END      0x398000
 
+static unsigned ps2_scancode_to_usb_hid_scancode[256] = {
+    0, 66, 0, 62, 60, 58, 59, 69,    // F9, F5, F3, F1, F2, F12
+    0, 67, 65, 63, 61, 43, 53, 0,    // F10, F8, F6, F4, tab, ` (back tick)
+    0, 226, 225, 0, 224, 20, 30, 0,  // left alt, left shift, left control, Q, 1
+    0, 0, 29, 22, 4, 26, 31, 0,      // Z, S, A, W, 2
+    0, 6, 27, 7, 8, 33, 32, 0,       // C, X, D, E, 4, 3
+    0, 44, 25, 9, 23, 21, 34, 0,     // space, V, F, T, R, 5
+    0, 17, 5, 11, 10, 28, 35, 0,     // N, B, H, G, Y, 6
+    0, 0, 16, 13, 24, 36, 37, 0,     // M, J, U, 7, 8
+    0, 54, 14, 12, 18, 39, 38, 0,    // ,, K, I, O, 0 (zero), 9
+    0, 55, 56, 15, 51, 19, 45, 0,    // ., /, L, ;, P, -
+    0, 0, 52, 0, 47, 46, 0, 0,       // ', [, =
+    57, 229, 158, 48, 0, 49, 0, 0,   // CapsLock, right shift, enter, ],
+    0, 0, 0, 0, 0, 0, 42, 0,         // backspace
+    0, 89, 0, 92, 95, 0, 0, 0,       // KP 1, KP 4, KP 7
+    98, 99, 90, 93, 94, 96, 41, 131, // KP 0, KP ., KP 2, KP 5, KP 6, KP 8, escape, NumberLock
+    68, 87, 91, 86, 85, 97, 71, 0,   // F11, KP +, KP 3, KP -, KP *, KP 9, ScrollLock
+    0, 0, 0, 0, 0, 0, 0, 0,          // 
+    0, 0, 0, 0, 0, 0, 0, 0,          // 
+    0, 230, 0, 0, 228, 0, 0, 0,      // search, right alt, right control, previous track
+    0, 0, 0, 0, 0, 0, 0, 227,        // favourites, left GUI
+    0, 0, 0, 0, 0, 0, 0, 231,        // refresh, volume down, mute, right GUI
+    0, 0, 0, 0, 0, 0, 0, 0,          // stop, calculator, apps
+    0, 0, 0, 0, 0, 0, 0, 0,          // forward, volume up, play/pause, power
+    0, 0, 0, 0, 0, 0, 0, 0,          // back, home, stop, sleep
+    0, 0, 0, 0, 0, 0, 0, 0,          // my computer
+    0, 0, 84, 0, 0, 0, 0, 0,         // email, KP /, next track
+    0, 0, 0, 0, 0, 0, 0, 0,          // media select
+    0, 0, 88, 0, 0, 0, 0, 0,         // KP enter, wake
+    0, 0, 0, 0, 0, 0, 0, 0,          // 
+    0, 77, 0, 80, 74, 0, 0, 0,       // end, cursor left, home
+    73, 76, 81, 0, 79, 82, 0, 0,     // insert, delete, cursor down, cursor right, cursor up
+    0, 0, 78, 0, 0, 75, 0, 0,        // page down, page up
+};
+
 /* Process PS/2 scancode byte - handles Set 2 protocol */
 static void funcval_latch_scancode(uint8_t data)
 {
@@ -237,15 +272,19 @@ static void funcval_latch_scancode(uint8_t data)
 		code |= 0x80;
 	}
 
-	/* Update keyboard matrix */
-	SDLQLKeyrowChg(code, press);
+	int usb_hid_code = ps2_scancode_to_usb_hid_scancode[code];
+
+	if (usb_hid_code != 0) {
+		/* Update keyboard matrix */
+		SDLQLKeyrowChg(code, press);
+	}
 
 	/* Reset state machine */
 	ps2_state = PS2_STATE_NORMAL;
 
 	if (asyncTrace) {
-		printf("FuncVal PS/2: scancode 0x%02X -> code 0x%02X, %s\n",
-		       data, code, press ? "press" : "release");
+		printf("FuncVal PS/2: scancode 0x%02X -> code 0x%02X -> USB hid code 0%02X, %s\n",
+		       data, code, usb_hid_code, press ? "press" : "release");
 	}
 }
 
