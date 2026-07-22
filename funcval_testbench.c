@@ -85,7 +85,7 @@ static double da_src_pos = 0.0;
 #define FUNCVAL_KB_MATRIX_MAX    0x380087
 
 /* Built-in keyboard matrix bit-to-scancode mappings from mkeyboard.v
- * Each row has a set of bits that map to specific PS/2 scancodes
+ * Each row has a set of bits that map to specific USB HID scancodes
  * Rows are scanned via keyb_row_o (one-hot), columns read via keyb_col_i
  */
 
@@ -227,13 +227,13 @@ static unsigned ps2_scancode_to_usb_hid_scancode[256] = {
     0, 54, 14, 12, 18, 39, 38, 0,    // ,, K, I, O, 0 (zero), 9
     0, 55, 56, 15, 51, 19, 45, 0,    // ., /, L, ;, P, -
     0, 0, 52, 0, 47, 46, 0, 0,       // ', [, =
-    57, 229, 158, 48, 0, 49, 0, 0,   // CapsLock, right shift, enter, ],
+    57, 229, 40, 48, 0, 49, 0, 0,    // CapsLock, right shift, enter, ],
     0, 0, 0, 0, 0, 0, 42, 0,         // backspace
     0, 89, 0, 92, 95, 0, 0, 0,       // KP 1, KP 4, KP 7
-    98, 99, 90, 93, 94, 96, 41, 131, // KP 0, KP ., KP 2, KP 5, KP 6, KP 8, escape, NumberLock
+    98, 99, 90, 93, 94, 96, 41, 83,  // KP 0, KP ., KP 2, KP 5, KP 6, KP 8, escape, NumberLock
     68, 87, 91, 86, 85, 97, 71, 0,   // F11, KP +, KP 3, KP -, KP *, KP 9, ScrollLock
-    0, 0, 0, 0, 0, 0, 0, 0,          // 
-    0, 0, 0, 0, 0, 0, 0, 0,          // 
+    0, 0, 0, 64, 0, 0, 0, 0,         //
+    0, 0, 0, 0, 0, 0, 0, 0,          //
     0, 230, 0, 0, 228, 0, 0, 0,      // search, right alt, right control, previous track
     0, 0, 0, 0, 0, 0, 0, 227,        // favourites, left GUI
     0, 0, 0, 0, 0, 0, 0, 231,        // refresh, volume down, mute, right GUI
@@ -276,15 +276,15 @@ static void funcval_latch_scancode(uint8_t data)
 
 	if (usb_hid_code != 0) {
 		/* Update keyboard matrix */
-		SDLQLKeyrowChg(code, press, 0);
+		SDLQLKeyrowChg(usb_hid_code, press, 0);
 	}
 
 	/* Reset state machine */
 	ps2_state = PS2_STATE_NORMAL;
 
 	if (asyncTrace) {
-		printf("FuncVal PS/2: scancode 0x%02X -> code 0x%02X -> USB hid code 0%02X, %s\n",
-		       data, code, usb_hid_code, press ? "press" : "release");
+		printf("FuncVal PS/2: scancode 0x%02X -> USB hid code 0%02X, %s\n",
+		       data, usb_hid_code, press ? "press" : "release");
 	}
 }
 
@@ -696,7 +696,7 @@ void funcval_write_byte(aw32 addr, aw8 data)
 
 	/* Built-in keyboard matrix writes (0x380080-0x380087)
 	 * Each write contains an 8-bit value where each bit controls one key
-	 * in that row. Bits are mapped to PS/2 scancodes via the
+	 * in that row. Bits are mapped to USB HID scancodes via the
 	 * keyboard_matrix_scancodes array.
 	 */
 	if (addr >= FUNCVAL_KB_MATRIX_BASE && addr <= FUNCVAL_KB_MATRIX_MAX) {
@@ -718,8 +718,8 @@ void funcval_write_byte(aw32 addr, aw8 data)
 			SDLQLKeyrowChg(scancode, bit_set ? 0 : 1, 0);
 
 			if (asyncTrace) {
-				printf("FuncVal KB Matrix: row %d, bit %d, scancode 0x%02X -> code 0x%02X, %s\n",
-				       row, bit, scancode, code, bit_set ? "press" : "release");
+				printf("FuncVal KB Matrix: row %d, bit %d, scancode 0x%02X, %s\n",
+				       row, bit, scancode, bit_set ? "release" : "press");
 			}
 		}
 		return;
