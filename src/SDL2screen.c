@@ -503,9 +503,16 @@ static bool QLSDLCreateDisplay(int w, int h, int ly, uint32_t *id,
 	QLSDLCreateIcon(ql_window);
 	ql_windowid = SDL_GetWindowID(ql_window);
 
-	ql_renderer = SDL_CreateRenderer(ql_window, -1,
-					 SDL_RENDERER_ACCELERATED |
-						 SDL_RENDERER_PRESENTVSYNC);
+	/* Try to create renderer with acceleration first, fall back to SDL-chosen if that fails */
+	ql_renderer = SDL_CreateRenderer(ql_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+	if (!ql_renderer) {
+		ql_renderer = SDL_CreateRenderer(ql_window, -1, 0);
+	}
+
+	if (ql_renderer == NULL) {
+		printf("SDL_CreateRenderer Error: %s\n", SDL_GetError());
+		return false;
+	}
 
 	SDL_RenderSetLogicalSize(ql_renderer, qlscreen.xres, ly);
 
@@ -524,7 +531,6 @@ static bool QLSDLCreateDisplay(int w, int h, int ly, uint32_t *id,
 		return false;
 	}
 
-	printf("w: %d h :%d\n", ql_screen->w, ql_screen->h);
 	ql_texture = SDL_CreateTexture(ql_renderer, SDL_PIXELFORMAT_RGBA32,
 				       SDL_TEXTUREACCESS_STREAMING,
 				       ql_screen->w, ql_screen->h);
