@@ -137,7 +137,8 @@ void emulatorInit()
 	const char *rom1 = emulatorOptionString("rom1");
 	const char *rom2 = emulatorOptionString("rom2");
 	const char *cart = emulatorOptionString("cart");
-	const char *sdcard = emulatorOptionString("sdcard");
+	const char *sdcard0 = emulatorOptionString("sdcard0");
+	const char *sdcard1 = emulatorOptionString("sdcard1");
 #else
     const char *sysrom = emulatorOptionString("sysrom");
 	const char *romport = emulatorOptionString("romport");
@@ -170,9 +171,7 @@ void emulatorInit()
 	}
 
 	// Initialize SD card emulation
-	if (strlen(sdcard)) {
-		SDSPI_Init(sdcard);
-	}
+	SDSPI_Init(sdcard0, sdcard1);
 
 	// Initialize I2C RTC emulation
 	i2c_rtc_init();

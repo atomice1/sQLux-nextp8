@@ -101,7 +101,9 @@ struct emuOpts emuOptions[] = {
 #endif
 {"romdir", "", "path to the roms", EMU_OPT_CHAR, 0, "roms"},
 #ifdef NEXTP8
-{"sdcard", "", "path to the SD card image", EMU_OPT_CHAR, 0, ""},
+{"sdcard0", "", "path to the SD card 0 image", EMU_OPT_CHAR, 0, ""},
+{"sdcard", "", "path to the SD card image (alias for sdcard0)", EMU_OPT_CHAR, 0, ""},
+{"sdcard1", "", "path to the SD card 1 image", EMU_OPT_CHAR, 0, ""},
 #endif
 #ifndef NEXTP8
 {"romport", "", "rom in QL rom port (0xC000 address)", EMU_OPT_CHAR, 0, NULL},
@@ -441,6 +443,15 @@ int emulatorOptionParse(int argc, char **argv)
 		exit(1);
 	}
 
+	/* Check that --sdcard and --sdcard0 are not both specified */
+	/* Since they're separate options, we can check their counts independently */
+	int sdcard0_count = ap_count(parser, "sdcard0");
+	int sdcard_count = ap_count(parser, "sdcard");
+	if (sdcard_count > 0 && sdcard0_count > 0) {
+		fprintf(stderr, "Error: --sdcard is an alias for --sdcard0. Do not specify both.\n");
+		exit(1);
+	}
+
 #ifndef NEXTP8
 	for (i = 0; i < ap_count(parser, "device"); i++) {
 		int count;
@@ -496,6 +507,16 @@ void emulatorOptionsRemove()
 char *emulatorOptionString(const char *name)
 {
 	int i;
+
+	/* Check sdcard as an alias for sdcard0 */
+	if (strcmp(name, "sdcard0") == 0) {
+		if (ap_count(parser, "sdcard0") > 0) {
+			return ap_get_str_value(parser, "sdcard0");
+		}
+		if (ap_count(parser, "sdcard") > 0) {
+			return ap_get_str_value(parser, "sdcard");
+		}
+	}
 
 	if (ap_count(parser, name)) {
 		return ap_get_str_value(parser, name);

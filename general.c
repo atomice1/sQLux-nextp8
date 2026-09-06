@@ -398,6 +398,12 @@ void WriteHWByte(aw32 addr, aw8 d)
 	case _JOYSTICK1_LATCHED:
 		joy_latched[1] &= ~d;
 		break;
+	case _P8AUDIO_HWFX40:
+	case _P8AUDIO_HWFX41:
+	case _P8AUDIO_HWFX42:
+	case _P8AUDIO_HWFX43:
+		p8audio_verilated_mmio_write((uint8_t)(addr - _P8AUDIO_BASE), d);
+		break;
 #else
 	case 0x018063: /* Display control */
 		SetDisplay(d, true);
@@ -809,6 +815,10 @@ void WriteHWWord(aw32 addr, aw16 d)
 	case _P8AUDIO_MUSIC_FADE:
 	case _P8AUDIO_SFX_CMD:
 	case _P8AUDIO_MUSIC_CMD:
+	case _P8AUDIO_HWFX40:
+	case _P8AUDIO_HWFX41:
+	case _P8AUDIO_HWFX42:
+	case _P8AUDIO_HWFX43:
 		p8audio_verilated_mmio_write((uint8_t)(addr - _P8AUDIO_BASE), d);
 		break;
 	case _UART_BAUD_DIV:
