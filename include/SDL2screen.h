@@ -51,6 +51,9 @@ void SDLQLKeyrowChg(int code, int press, unsigned keymod);
 void QLSDLSaveFuncvalScreenshot(const char *filename);
 int QLSDLReadFramebufferPixel(int x, int y, uint16_t *pixel);
 
+/* Key queue functions */
+void key_queue_push(uint32_t key_event);
+
 #define USER_CODE_SCREENREFRESH     0
 #define USER_CODE_EMUEXIT           1
 

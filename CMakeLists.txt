@@ -210,7 +210,11 @@ set_source_files_properties(p8audio_verilated.cpp
 set_source_files_properties(QL_sound.c
     PROPERTIES COMPILE_FLAGS "-DSDL_OpenAudioDevice=SDL_OpenAudioDevice_shim")
 
+# Add dependencies on generated files and custom targets
 add_dependencies(${SQLUX_EXECUTABLE_NAME} SubmarineGitVersion)
+
+# Add keyboard verilated to source files
+target_sources(${SQLUX_EXECUTABLE_NAME} PRIVATE keyboard_verilated.cpp)
 
 # Verilate the p8audio SV sources into C++ and link into the executable.
 # Use REALPATH to normalize away '..' so Verilator doesn't get confused when
@@ -226,6 +230,21 @@ verilate(${SQLUX_EXECUTABLE_NAME}
     SOURCES ${P8AUDIO_SV_DIR}/p8audio.sv ${P8AUDIO_SV_DIR}/fp_ops.sv
     INCLUDE_DIRS ${P8AUDIO_SV_DIR}
     VERILATOR_ARGS --sv --no-timing -Wno-WIDTH -Wno-IMPLICITSTATIC -Wno-CASEINCOMPLETE)
+
+# Verilate the keyboard modules
+# keyboard_top.sv is in sQLux-nextp8 and instantiates mkeyboard and kbd_event
+get_filename_component(KEYBOARD_TOP_DIR ${CMAKE_CURRENT_SOURCE_DIR} REALPATH)
+get_filename_component(KEYBOARD_SV_DIR ${NEXTP8_CORE}/nextp8.srcs/sources_1 REALPATH)
+
+# Verilate keyboard_top.sv which includes mkeyboard and kbd_event internally
+verilate(${SQLUX_EXECUTABLE_NAME}
+    PREFIX Vkbd_top
+    TOP_MODULE keyboard_top
+    SOURCES ${KEYBOARD_TOP_DIR}/keyboard_top.sv
+            ${KEYBOARD_SV_DIR}/mkeyboard.v
+            ${KEYBOARD_SV_DIR}/kbd_event.sv
+    INCLUDE_DIRS ${KEYBOARD_TOP_DIR} ${KEYBOARD_SV_DIR}
+    VERILATOR_ARGS --cc --no-timing -Wno-WIDTH -Wno-CASEINCOMPLETE)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
   target_sources(${SQLUX_EXECUTABLE_NAME} PRIVATE sQLuxLogo.rc)

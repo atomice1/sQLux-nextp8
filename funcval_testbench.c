@@ -29,6 +29,7 @@
 #include "QL68000.h"
 #include "funcval_testbench.h"
 #include "SDL2screen.h"
+#include "keyboard_verilated.h"
 #include "QL_sound.h"
 
 /* External asyncTrace flag for test logging */
@@ -695,32 +696,32 @@ void funcval_write_byte(aw32 addr, aw8 data)
 	}
 
 	/* Built-in keyboard matrix writes (0x380080-0x380087)
-	 * Each write contains an 8-bit value where each bit controls one key
-	 * in that row. Bits are mapped to USB HID scancodes via the
-	 * keyboard_matrix_scancodes array.
+	 * Each write contains a 7-bit value where each bit controls one column
+	 * in that row. Columns are active-low: 0=pressed, 1=released.
+	 *
+	 * This directly controls the membrane keyboard matrix, which is processed
+	 * by the Verilator mkeyboard model to generate USB HID scancodes.
 	 */
 	if (addr >= FUNCVAL_KB_MATRIX_BASE && addr <= FUNCVAL_KB_MATRIX_MAX) {
 		int row = addr - FUNCVAL_KB_MATRIX_BASE;
-		const uint8_t *row_scancodes = keyboard_matrix_scancodes[row];
+		uint8_t col_mask = data & 0x7F;  /* Only 7 columns */
 
-		/* Iterate through each bit in this row */
-		for (int bit = 0; bit < 7; bit++) {
-			uint8_t scancode = row_scancodes[bit];
+		/* Update Verilator model's column state for this row */
+		for (int col = 0; col < 7; col++) {
+			int bit_set = (col_mask >> col) & 1;
+			int pressed = (bit_set == 0);  /* 0 bit = pressed (active-low) */
+			keyboard_verilated_set_col(row, col, pressed);
+		}
 
-			/* Skip reserved scancode values */
-			if (scancode == 0xFF)
-				continue;
+		/* Tick mkeyboard and kbd_event for matrix scanning.
+		 * kbd_push_req is a pulse that goes high for one cycle when an event is ready.
+		 * keyboard_verilated_tick_n() ticks and checks for pulses inline, so events are
+		 * not missed.
+		 */
+		keyboard_verilated_tick_n(16384);
 
-			/* Extract bit value from data and determine press/release */
-			int bit_set = (data >> bit) & 1;
-
-			/* Columns are active-low: 0 = pressed, 1 = released */
-			SDLQLKeyrowChg(scancode, bit_set ? 0 : 1, 0);
-
-			if (asyncTrace) {
-				printf("FuncVal KB Matrix: row %d, bit %d, scancode 0x%02X, %s\n",
-				       row, bit, scancode, bit_set ? "release" : "press");
-			}
+		if (asyncTrace) {
+			printf("FuncVal KB Matrix: row %d, col_mask 0x%02X\n", row, col_mask);
 		}
 		return;
 	}

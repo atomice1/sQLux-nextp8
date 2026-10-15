@@ -811,6 +811,10 @@ static void QLSDLUpdatePixelBuffer()
 	}
 
 #ifdef NEXTP8
+	vfront = vfrontreq;
+#endif
+
+#ifdef NEXTP8
 	uint8_t *emulatorScreenPtr = (uint8_t *)&frameBuffer[vfront];
 #else
 	uint8_t *emulatorScreenPtr = (uint8_t *)memBase + qlscreen.qm_lo;
@@ -821,12 +825,6 @@ static void QLSDLUpdatePixelBuffer()
 				    emulatorScreenPtrEnd);
 
 #ifdef NEXTP8
-	static bool debug_next;
-	if (vfront != vfrontreq || debug_next) {
-		//printf("VFRONT: %d VFRONTREQ: %d\n", vfront, vfrontreq);
-		debug_next = vfront != vfrontreq;
-	}
-	vfront = vfrontreq;
 	/* Trigger VBLANK interrupt if enabled */
 	if (vblank_intr_enable) {
 		pendingInterrupt = 2;  /* Level 2 interrupt */
@@ -843,6 +841,10 @@ static void QLSDLUpdatePixelBuffer()
 void QLSDLWritePixels(uint32_t *pixelPtr32)
 {
 #ifdef NEXTP8
+	vfront = vfrontreq;
+#endif
+
+#ifdef NEXTP8
 	uint8_t *emulatorScreenPtr = (uint8_t *)&frameBuffer[vfront];
 #else
 	uint8_t *emulatorScreenPtr = (uint8_t *)memBase + qlscreen.qm_lo;
@@ -853,12 +855,6 @@ void QLSDLWritePixels(uint32_t *pixelPtr32)
 				    emulatorScreenPtrEnd);
 
 #ifdef NEXTP8
-	static bool debug_next;
-	if (vfront != vfrontreq || debug_next) {
-		//printf("VFRONT: %d VFRONTREQ: %d\n", vfront, vfrontreq);
-		debug_next = vfront != vfrontreq;
-	}
-	vfront = vfrontreq;
 	/* Trigger VBLANK interrupt if enabled */
 	if (vblank_intr_enable) {
 		pendingInterrupt = 2;  /* Level 2 interrupt */
@@ -1010,7 +1006,7 @@ void key_queue_push(uint32_t key_event)
 
 uint32_t key_queue_pop(void)
 {
-  if (key_queue_read_index == key_queue_write_index)
+if (key_queue_read_index == key_queue_write_index)
   {
      // buffer is empty
      return 0;
@@ -1035,6 +1031,7 @@ uint32_t key_queue_peek(void)
 
 void key_queue_clear(void)
 {
+	printf("key_queue_clear\n");
 	key_queue_read_index = key_queue_write_index;
 }
 #endif
@@ -1522,7 +1519,7 @@ void QLSDLSaveFuncvalScreenshot(const char *filename)
 int QLSDLReadFramebufferPixel(int x, int y, uint16_t *pixel)
 {
 #ifdef NEXTP8
-	printf("Read framebuffer pixel at (%d, %d)\n", x, y);
+	printf("Read framebuffer pixel at (%d, %d) vfront=%d\n", x, y, vfront);
 
 	/* Get native framebuffer data */
 	uint8_t *emulatorScreenPtr = (uint8_t *)&frameBuffer[vfront];
@@ -1553,13 +1550,15 @@ int QLSDLReadFramebufferPixel(int x, int y, uint16_t *pixel)
 	/* Convert framebuffer to 32-bit RGBA pixels */
 	emulatorUpdatePixelBufferQL(native_pixels, emulatorScreenPtr, emulatorScreenPtrEnd);
 
-	/* Get pixel at native coordinates */
-	uint32_t rgba = native_pixels[native_y * native_width + native_x];
+	/* Get pixel at native coordinates - read as 32-bit native format */
+	int pixel_index = native_y * native_width + native_x;
+	uint32_t rgba = native_pixels[pixel_index];
 
-	/* Convert from RGBA8888 to 0RGB (12-bit) */
-	uint8_t b = (rgba >> 16) & 0xFF;
-	uint8_t g = (rgba >> 8) & 0xFF;
+	/* SDL_MapRGB with RGBA32 format stores as 0xAABBGGRR on little-endian */
+	/* Byte order in memory (lowest to highest): R, G, B, A */
 	uint8_t r = rgba & 0xFF;
+	uint8_t g = (rgba >> 8) & 0xFF;
+	uint8_t b = (rgba >> 16) & 0xFF;
 
 	/* Convert 8-bit to 4-bit per channel */
 	r = r >> 4;
@@ -1568,7 +1567,7 @@ int QLSDLReadFramebufferPixel(int x, int y, uint16_t *pixel)
 		/* Pack as 0RGB */
 	*pixel = ((r & 0xF) << 8) | ((g & 0xF) << 4) | (b & 0xF);
 
-	printf("Read pixel RGBA: %08x -> 0RGB: %03X\n", rgba, *pixel);
+	printf("Read pixel RGBA: %08x -> 0RGB: %03X (r=%x g=%x b=%x) pixel=%04x\n", rgba, *pixel, r, g, b, *pixel);
 
 	free(native_pixels);
 	return 0;

@@ -9,6 +9,7 @@
 #include "emulator_init.h"
 #include "emulator_options.h"
 #include "p8audio_verilated.h"
+#include "keyboard_verilated.h"
 #include "QL_sound.h"
 #include "SDL2screen.h"
 #include "unixstuff.h"
@@ -103,6 +104,7 @@ void emu_loop() {
         QLSDLScreen();
         initSound(emulatorOptionInt("sound"));
         p8audio_verilated_init();
+        keyboard_verilated_init();
         emuThread = SDL_CreateThread(QLRun, "sQLux Emulator", NULL);
         init_done = 1;
     }
