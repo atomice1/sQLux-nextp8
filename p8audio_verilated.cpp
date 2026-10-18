@@ -2,10 +2,7 @@
  * p8audio_verilated.cpp
  *
  * Verilator-based replacement for p8_audio.c / p8_dsp.c.
- *
- * Wraps the Verilated p8audio.sv + p8sfx_core_mux.sv model and exposes:
- *   - p8audio_verilated_init  (called from SDL2main.c)
- *   - p8audio_verilated_mmio_write  (called from reworked p8audio.c)
+ * Dual-model architecture: RT model for functional validation, PB model for audio playback.
  *
  * Clock scheduling (all driven in the SDL audio callback thread):
  *
@@ -33,8 +30,15 @@
 #include <cstdio>
 #include <cstring>
 #include <cassert>
-#include <pthread.h>
 #include <stdint.h>
+#include <pthread.h>
+#include <deque>
+#include <algorithm>
+
+extern "C" uint64_t GetUserTimer(void);
+
+/* Mutex for PB command queue (CPU thread writes, audio thread reads) */
+static pthread_mutex_t s_pb_cmd_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*==============================================================
  * Clock ratios
@@ -49,283 +53,313 @@ static const int SAMPLE_RATE_HW   = 22050;  /* matches clk_pcm */
 static const int SDL_BUFFER_SAMPLES = 1024; /* ~46 ms */
 
 /*==============================================================
- * MMIO command queue (CPU thread → audio thread)
+ * MMIO command for PB queue
  *==============================================================*/
 struct mmio_cmd_t {
     uint8_t  byte_addr;
     uint16_t data;
 };
 
-static const int QUEUE_CAPACITY = 1024;
-
-static mmio_cmd_t   s_queue_buf[QUEUE_CAPACITY];
-static int          s_queue_head = 0;   /* next slot to read  */
-static int          s_queue_tail = 0;   /* next slot to write */
-static int          s_queue_count = 0;
-static pthread_mutex_t s_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-/* Push a write – silently drops if queue is full (shouldn't happen). */
-extern "C" void p8audio_verilated_mmio_write(uint8_t byte_addr, uint16_t data)
-{
-    pthread_mutex_lock(&s_queue_mutex);
-    if (s_queue_count < QUEUE_CAPACITY) {
-        s_queue_buf[s_queue_tail].byte_addr = byte_addr;
-        s_queue_buf[s_queue_tail].data      = data;
-        s_queue_tail = (s_queue_tail + 1) % QUEUE_CAPACITY;
-        s_queue_count++;
-    } else {
-        fprintf(stderr, "[p8audio_verilated] MMIO queue overflow – dropped write addr=0x%02x data=0x%04x\n",
-                byte_addr, data);
-    }
-    pthread_mutex_unlock(&s_queue_mutex);
-}
-
-/* Pop one entry.  Returns false if empty.  Call from audio thread only. */
-static bool queue_pop(mmio_cmd_t *out, bool lock_queue)
-{
-    if (lock_queue) pthread_mutex_lock(&s_queue_mutex);
-    if (s_queue_count == 0) {
-        if (lock_queue) pthread_mutex_unlock(&s_queue_mutex);
-        return false;
-    }
-    *out = s_queue_buf[s_queue_head];
-    s_queue_head = (s_queue_head + 1) % QUEUE_CAPACITY;
-    s_queue_count--;
-    if (lock_queue) pthread_mutex_unlock(&s_queue_mutex);
-    return true;
-}
-
 /*==============================================================
- * Verilated model state
+ * Dual-model architecture
+ *
+ * RT model: Real-time model for functional validation (CPU thread)
+ * PB model: Playback model for audio generation (audio thread)
+ *
+ * Communication:
+ * - MMIO writes: queued to PB model via s_pb_cmd_queue, processed in audio callback
+ * - RT model: advances on MMIO operations via time-based advancement
+ * - PB model: advances in audio callback, driven by SDL audio demand
  *==============================================================*/
-static Vp8audio        *s_model     = nullptr;
+
+/* Two Verilated models */
+static Vp8audio        *s_rt_model  = nullptr;  /* Real-time model (CPU thread) */
+static Vp8audio        *s_pb_model  = nullptr;  /* Playback model (audio thread) */
 static VerilatedContext *s_vl_ctx   = nullptr;
 
-/*==============================================================
- * Stat shadow cache (audio thread writes, CPU thread reads)
- *
- * Mirrors ADDR_STAT46..ADDR_STAT57 from p8audio.sv:
- *   index 0-3  : STAT46-49  SFX slot per channel (0xFFFF = idle)
- *   index 4-7  : STAT50-53  note index per channel (0xFFFF = idle)
- *   index 8    : STAT54     music pattern index
- *   index 9    : STAT55     music pattern loop count
- *   index 10   : STAT56     music note-tick count
- *   index 11   : STAT57     music playing flag (0 or 1)
- *==============================================================*/
-static const uint8_t k_stat_offsets[12] = {
-    0x20, 0x22, 0x24, 0x26,   /* STAT46-49: SFX slot per channel     */
-    0x28, 0x2A, 0x2C, 0x2E,   /* STAT50-53: note index per channel   */
-    0x30, 0x32, 0x34, 0x36    /* STAT54-57: music pattern/count/tick/playing */
-};
-static uint16_t        s_stat_cache[12];
-static pthread_mutex_t s_stat_mutex = PTHREAD_MUTEX_INITIALIZER;
+/* RT model time tracking (CPU thread only, no mutex needed) */
+static uint64_t         s_rt_start_time = 0;
+static uint64_t         s_rt_samples_advanced = 0;
+
+/* PB command queue (CPU thread writes, audio thread reads) */
+static std::deque<mmio_cmd_t> s_pb_cmd_queue;
 
 /*==============================================================
- * Clock helpers
+ * Forward declarations
+ *==============================================================*/
+static inline void tick_mclk(Vp8audio *model, int level);
+static inline void tick_8x(Vp8audio *model, int level);
+static inline void tick_pcm(Vp8audio *model, int level);
+static void service_dma(Vp8audio *model);
+static void drain_pb_queue_to_model(void);
+static void advance_rt_model_samples(int n);
+static void perform_mmio_transaction(Vp8audio *model, uint8_t byte_addr, uint16_t data);
+static void advance_one_sample_common(Vp8audio *model);
+static uint16_t read_stat_register_direct(Vp8audio *model, uint8_t byte_offset);
+static void audio_callback_verilated(void *userdata, uint8_t *stream, int len);
+
+/*==============================================================
+ * Helper functions for dual-model architecture
  *==============================================================*/
 
-/* Single mclk half-cycle. */
-static inline void tick_mclk(int level)
+/* Calculate elapsed samples since last RT model operation */
+static inline int elapsed_samples_since_last(uint64_t now)
 {
-    s_model->mclk = level;
-    s_model->eval();
+    uint64_t elapsed_us = now - s_rt_start_time;
+
+    /* 22050 Hz = ~45.3 µs per sample */
+    uint64_t elapsed_samples = (int)(elapsed_us * 22050ULL / 1000000ULL);
+    return elapsed_samples - s_rt_samples_advanced;
 }
 
-/* Single clk_pcm_8x half-cycle. */
-static inline void tick_8x(int level)
+/* Advance RT model by elapsed time since last operation */
+static inline void advance_rt_model_by_time(void)
 {
-    s_model->clk_pcm_8x = level;
-    s_model->eval();
+    uint64_t now = GetUserTimer();
+    uint64_t to_advance = elapsed_samples_since_last(now);
+    if (to_advance > 0) {
+        advance_rt_model_samples(to_advance);
+        s_rt_samples_advanced += to_advance;
+    }
 }
 
-/* Single clk_pcm half-cycle. */
-static inline void tick_pcm(int level)
+/* Get current pcm_out from a model without advancement */
+static inline int16_t get_model_sample(Vp8audio *model)
 {
-    s_model->clk_pcm = level;
-    s_model->eval();
+    // Sign-extend from PCM_WID bits to 16 bits
+    int16_t val = (int16_t)model->pcm_out;
+    int shift = 16 - PCM_WID;
+    return (val << shift) >> shift;  // Arithmetic shift extends sign bit
+}
+
+/* Single MMIO write transaction on given model */
+static void perform_mmio_transaction(Vp8audio *model, uint8_t byte_addr, uint16_t data)
+{
+    /* The 7-bit 'address' port is the byte-address shifted right by 1 (word address) */
+    model->address  = byte_addr >> 1;
+    model->din      = data;
+    model->nUDS     = 0;
+    model->nLDS     = 0;
+    model->write_en = 1;
+    model->read_en  = 0;
+
+    tick_mclk(model, 0);   /* setup on falling edge */
+    tick_mclk(model, 1);   /* latch on rising edge  */
+    //service_dma(model);
+
+    model->write_en = 0;
+    model->nUDS     = 1;
+    model->nLDS     = 1;
+
+    tick_mclk(model, 0);
+    tick_mclk(model, 1);
+    //service_dma(model);
+}
+
+/* Advance model by exactly one PCM sample (common implementation) */
+static void advance_one_sample_common(Vp8audio *model)
+{
+    for (int slot = 0; slot < PCM_8X_PER_PCM; slot++) {
+        tick_8x(model, 1);
+        tick_8x(model, 0);
+        tick_mclk(model, 1);
+        if (model->dma_req) {
+            for (int i=0;i<200;++i) {
+                //service_dma(model);
+                tick_mclk(model, 0);
+                tick_mclk(model, 1);
+            }
+            //service_dma(model);
+        }
+        tick_mclk(model, 0);
+    }
+
+    tick_pcm(model, 1);   /* clk_pcm rising – model outputs sample */
+    tick_pcm(model, 0);
+}
+
+/* Drain PB command queue into PB model.
+ * Must be called with s_pb_cmd_mutex locked.
+ * The caller is responsible for locking/unlocking the mutex. */
+static void drain_pb_queue_to_model(void)
+{
+    while (!s_pb_cmd_queue.empty()) {
+        mmio_cmd_t cmd = s_pb_cmd_queue.front();
+        s_pb_cmd_queue.pop_front();
+
+        perform_mmio_transaction(s_pb_model, cmd.byte_addr, cmd.data);
+    }
+}
+
+/* Advance RT model by N samples */
+static void advance_rt_model_samples(int n)
+{
+    for (int i = 0; i < n; i++) {
+        advance_one_sample_common(s_rt_model);
+    }
+}
+
+/* Advance stat register directly from model */
+static uint16_t read_stat_register_direct(Vp8audio *model, uint8_t byte_offset)
+{
+    if (byte_offset < 0x20 || byte_offset > 0x36 || (byte_offset & 1u))
+        return 0;
+
+    uint16_t value = 0;
+    model->read_en  = 1;
+    model->write_en = 0;
+
+    uint8_t addr_offset = byte_offset >> 1;
+    model->address = addr_offset;
+    // First cycle: propagate address and read_en
+    tick_mclk(model, 0);   /* setup on falling edge */
+    tick_mclk(model, 1);   /* latch on rising edge  */
+    // Second cycle: ensure dout is stable
+    tick_mclk(model, 0);   /* setup on falling edge */
+    tick_mclk(model, 1);   /* latch on rising edge  */
+    value = model->dout;
+
+    model->read_en = 0;
+
+    // Cleanup cycle
+    tick_mclk(model, 0);   /* setup on falling edge */
+    tick_mclk(model, 1);   /* latch on rising edge  */
+
+    return value;
 }
 
 /*==============================================================
- * DMA service
- * Called after every mclk rising edge.  If the model has asserted
- * dma_req, provide the requested word from base RAM and pulse dma_ack.
+ * Clock helpers (both models run in sync)
  *==============================================================*/
-static void service_dma(void)
+
+/* Single mclk half-cycle on given model */
+static inline void tick_mclk(Vp8audio *model, int level)
 {
-    if (!s_model->dma_req)
+    if (level == 0 && model->dma_req) {
+        /* dma_addr is a 31-bit word address; each word is 16 bits, big-endian. */
+        uint32_t byte_addr = (uint32_t)model->dma_addr * 2u;
+
+        /* memBase is int32_t* so m_memory = (uint8_t*)memBase */
+        uint16_t rdata = (uint16_t)(((uint16_t)m_memory[byte_addr] << 8) |
+                                    (uint16_t)m_memory[byte_addr + 1u]);
+
+        model->dma_rdata = rdata;
+        model->dma_ack = 1;
+    }
+    model->mclk = level;
+    model->eval();
+    if (level == 1 && model->dma_ack)
+        model->dma_ack = 0;
+}
+
+/* Single clk_pcm_8x half-cycle on given model */
+static inline void tick_8x(Vp8audio *model, int level)
+{
+    model->clk_pcm_8x = level;
+    model->eval();
+}
+
+/* Single clk_pcm half-cycle on given model */
+static inline void tick_pcm(Vp8audio *model, int level)
+{
+    model->clk_pcm = level;
+    model->eval();
+}
+
+#if 0
+/* DMA service on given model - pulse dma_ack for one mclk cycle */
+static void service_dma(Vp8audio *model)
+{
+    if (!model->dma_req)
         return;
 
     /* dma_addr is a 31-bit word address; each word is 16 bits, big-endian. */
-    uint32_t byte_addr = (uint32_t)s_model->dma_addr * 2u;
+    uint32_t byte_addr = (uint32_t)model->dma_addr * 2u;
 
     /* memBase is int32_t* so m_memory = (uint8_t*)memBase */
-    s_model->dma_rdata = (uint16_t)(((uint16_t)m_memory[byte_addr] << 8) |
-                                     (uint16_t)m_memory[byte_addr + 1u]);
+    uint16_t rdata = (uint16_t)(((uint16_t)m_memory[byte_addr] << 8) |
+                                (uint16_t)m_memory[byte_addr + 1u]);
 
-    /* Pulse dma_ack for one mclk cycle */
-    s_model->dma_ack = 1;
-    tick_mclk(0);   /* falling edge */
-    tick_mclk(1);   /* rising edge with ack=1 */
-    s_model->dma_ack = 0;
+    model->dma_rdata = rdata;
+    model->dma_ack = 1;
+    tick_mclk(model, 0);   /* falling edge */
+    tick_mclk(model, 1);   /* rising edge with ack=1 */
+    model->dma_ack = 0;
 }
+#endif
 
 /*==============================================================
- * Flush queued MMIO writes into the model via mclk transactions.
- * Called from the audio thread before each sample batch.
- *==============================================================*/
-static void flush_mmio_queue(bool lock_queue)
-{
-    mmio_cmd_t cmd;
-    while (queue_pop(&cmd, lock_queue)) {
-        /* The 7-bit 'address' port is the byte-address shifted right by 1
-         * (word address).  nUDS and nLDS are both active (0) for 16-bit
-         * writes. */
-        s_model->address  = cmd.byte_addr >> 1;
-        s_model->din      = cmd.data;
-        s_model->nUDS     = 0;
-        s_model->nLDS     = 0;
-        s_model->write_en = 1;
-        s_model->read_en  = 0;
-
-        tick_mclk(0);   /* setup on falling edge */
-        tick_mclk(1);   /* latch on rising edge  */
-        service_dma();
-
-        s_model->write_en = 0;
-        s_model->nUDS     = 1;
-        s_model->nLDS     = 1;
-
-        tick_mclk(0);
-        tick_mclk(1);
-        service_dma();
-    }
-}
-
-/*==============================================================
- * Snapshot stat registers into the shadow cache.
- * Called from the audio thread after every PCM sample.
- * The read mux in p8audio.sv is combinational: setting address +
- * eval() makes dout valid immediately without a clock edge.
- *==============================================================*/
-static void update_stat_cache(void)
-{
-    uint16_t tmp[12];
-    s_model->read_en  = 1;
-    s_model->write_en = 0;
-    for (int i = 0; i < 12; i++) {
-        s_model->address = k_stat_offsets[i] >> 1;
-        s_model->eval();
-        tmp[i] = s_model->dout;
-    }
-    s_model->read_en = 0;
-    s_model->eval();
-
-    pthread_mutex_lock(&s_stat_mutex);
-    memcpy(s_stat_cache, tmp, sizeof(tmp));
-    pthread_mutex_unlock(&s_stat_mutex);
-}
-
-/*==============================================================
- * Advance model by exactly one PCM sample.
- *
- * Schedule:
- *   for slot in 0..7:
- *     rise clk_pcm_8x
- *     fall clk_pcm_8x
- *     rise mclk, service DMA, fall mclk   ← interleaved after each 8x slot
- *   rise clk_pcm  → pcm_out is latched
- *   fall clk_pcm
- *
- * One mclk tick AFTER each clk_pcm_8x slot allows the 2-stage CDC
- * synchronizer to capture the sfx_done (voice_done_pcm) pulse that fires
- * in the clk_pcm_8x domain.  Without this interleaving all 8 sub-slots
- * complete before any mclk edge, so the pulse is always missed and the
- * music sequencer never advances past the first pattern.
- *
- * Returns the new pcm_out value (signed PCM_WID-bit, sign-extended to int16_t).
- *==============================================================*/
-static int16_t advance_one_sample(void)
-{
-    for (int slot = 0; slot < PCM_8X_PER_PCM; slot++) {
-        tick_8x(1);
-        tick_8x(0);
-        tick_mclk(1);
-        if (s_model->dma_req) {
-            for (int i=0;i<200;++i) {
-                service_dma();
-                tick_mclk(0);
-                tick_mclk(1);
-            }
-            service_dma();
-        }
-        tick_mclk(0);
-    }
-
-    tick_pcm(1);   /* clk_pcm rising – model outputs sample */
-    tick_pcm(0);
-    /* Sign-extend PCM_WID-bit pcm_out to int16_t. */
-    int16_t s = (int16_t)((s_model->pcm_out ^ (1u << (PCM_WID - 1))) - (1u << (PCM_WID - 1)));
-    update_stat_cache();
-    return s;
-}
-
-/*==============================================================
- * SDL audio callback
- *==============================================================*/
-static void audio_callback_verilated(void *userdata, uint8_t *stream, int len)
-{
-    (void)userdata;
-    int16_t *buf     = (int16_t *)stream;
-    int      samples = len / (int)sizeof(int16_t);
-
-    flush_mmio_queue(true);
-
-    for (int i = 0; i < samples; i++) {
-        int16_t s_pcm = advance_one_sample();
-        /* Scale signed PCM_WID-bit → signed 16-bit */
-        buf[i] = s_pcm << (16 - PCM_WID);
-    }
-}
-
-/*==============================================================
- * Reset the Verilated model and hold for a few cycles.
+ * Reset the Verilated models and hold for a few cycles.
  *==============================================================*/
 static void model_reset(void)
 {
-    s_model->resetn_sys   = 0;
-    s_model->resetn_pcm   = 0;
-    s_model->resetn_pcm_8x = 0;
+    s_rt_model->resetn_sys   = 0;
+    s_rt_model->resetn_pcm   = 0;
+    s_rt_model->resetn_pcm_8x = 0;
 
-    s_model->mclk       = 0;
-    s_model->clk_pcm    = 0;
-    s_model->clk_pcm_8x = 0;
+    s_rt_model->mclk       = 0;
+    s_rt_model->clk_pcm    = 0;
+    s_rt_model->clk_pcm_8x = 0;
 
-    s_model->address  = 0;
-    s_model->din      = 0;
-    s_model->nUDS     = 1;
-    s_model->nLDS     = 1;
-    s_model->write_en = 0;
-    s_model->read_en  = 0;
-    s_model->dma_rdata = 0;
-    s_model->dma_ack   = 0;
+    s_rt_model->address  = 0;
+    s_rt_model->din      = 0;
+    s_rt_model->nUDS     = 1;
+    s_rt_model->nLDS     = 1;
+    s_rt_model->write_en = 0;
+    s_rt_model->read_en  = 0;
+    s_rt_model->dma_rdata = 0;
+    s_rt_model->dma_ack   = 0;
 
-    s_model->eval();
+    s_rt_model->eval();
 
     /* Drive reset for several cycles on each domain */
-    for (int i = 0; i < 12; i++) { tick_mclk(1); tick_mclk(0); }
-    for (int i = 0; i < 5;  i++) { tick_8x(1);   tick_8x(0);   }
-    for (int i = 0; i < 3;  i++) { tick_pcm(1);  tick_pcm(0);  }
+    for (int i = 0; i < 12; i++) { tick_mclk(s_rt_model, 1); tick_mclk(s_rt_model, 0); }
+    for (int i = 0; i < 5;  i++) { tick_8x(s_rt_model, 1);   tick_8x(s_rt_model, 0);   }
+    for (int i = 0; i < 3;  i++) { tick_pcm(s_rt_model, 1);  tick_pcm(s_rt_model, 0);  }
 
-    s_model->resetn_sys    = 1;
-    s_model->resetn_pcm    = 1;
-    s_model->resetn_pcm_8x = 1;
-    s_model->eval();
+    s_rt_model->resetn_sys    = 1;
+    s_rt_model->resetn_pcm    = 1;
+    s_rt_model->resetn_pcm_8x = 1;
+    s_rt_model->eval();
 
     /* Settle after reset deassertion */
-    for (int i = 0; i < 4; i++) { tick_mclk(1); tick_mclk(0); }
+    for (int i = 0; i < 4; i++) { tick_mclk(s_rt_model, 1); tick_mclk(s_rt_model, 0); }
 
-    /* Populate initial stat cache */
-    update_stat_cache();
+        if (s_pb_model) {
+        /* Reset PB model to match RT model */
+        s_pb_model->resetn_sys   = 0;
+        s_pb_model->resetn_pcm   = 0;
+        s_pb_model->resetn_pcm_8x = 0;
+
+        s_pb_model->mclk       = 0;
+        s_pb_model->clk_pcm    = 0;
+        s_pb_model->clk_pcm_8x = 0;
+
+        s_pb_model->address  = 0;
+        s_pb_model->din      = 0;
+        s_pb_model->nUDS     = 1;
+        s_pb_model->nLDS     = 1;
+        s_pb_model->write_en = 0;
+        s_pb_model->read_en  = 0;
+        s_pb_model->dma_rdata = 0;
+        s_pb_model->dma_ack   = 0;
+
+        s_pb_model->eval();
+
+        for (int i = 0; i < 12; i++) { tick_mclk(s_pb_model, 1); tick_mclk(s_pb_model, 0); }
+        for (int i = 0; i < 5;  i++) { tick_8x(s_pb_model, 1);   tick_8x(s_pb_model, 0);   }
+        for (int i = 0; i < 3;  i++) { tick_pcm(s_pb_model, 1);  tick_pcm(s_pb_model, 0);  }
+
+        s_pb_model->resetn_sys    = 1;
+        s_pb_model->resetn_pcm    = 1;
+        s_pb_model->resetn_pcm_8x = 1;
+        s_pb_model->eval();
+
+        for (int i = 0; i < 4; i++) { tick_mclk(s_pb_model, 1); tick_mclk(s_pb_model, 0); }
+    }
+
+    /* Initialize RT model time tracking */
+    s_rt_start_time = GetUserTimer();
 }
 
 /*==============================================================
@@ -342,9 +376,10 @@ void p8audio_verilated_init(void)
     if (s_model_init)
         return;
 
-    /* Create Verilated context and model */
+    /* Create Verilated context and both models */
     s_vl_ctx = new VerilatedContext;
-    s_model  = new Vp8audio(s_vl_ctx, "p8audio");
+    s_rt_model = new Vp8audio(s_vl_ctx, "p8audio_rt");
+    //s_pb_model = new Vp8audio(s_vl_ctx, "p8audio_pb");
 
     model_reset();
     s_model_init = true;
@@ -363,12 +398,15 @@ void p8audio_verilated_init(void)
     if (ret != 0) {
         fprintf(stderr, "[p8audio_verilated] SDL_OpenAudio failed: %s\n",
                 SDL_GetError());
-        int ret = pthread_create(&s_thread,
+        /* Create fallback thread that generates audio without SDL */
+        ret = pthread_create(&s_thread,
             nullptr,
             [](void*) -> void* {
                 int16_t *buf = new int16_t[SDL_BUFFER_SAMPLES];
                 while (!s_thread_stopping) {
+                    /* Generate dummy audio by advancing PB model */
                     audio_callback_verilated(nullptr, (uint8_t*)buf, sizeof(int16_t) * SDL_BUFFER_SAMPLES);
+                    /* Sleep for the duration of the buffered samples */
                     SDL_Delay(SDL_BUFFER_SAMPLES * 1000 / SAMPLE_RATE_HW);
                 }
                 delete[] buf;
@@ -396,16 +434,27 @@ void audio_pause(void)
 
 void audio_close(void)
 {
+    /* Stop fallback thread if running */
     if (s_thread != pthread_t{}) {
         s_thread_stopping = true;
         pthread_join(s_thread, nullptr);
-    } else {
+        s_thread = pthread_t{};
+    }
+
+    /* Close SDL audio if it was opened */
+    if (s_model_init) {
         SDL_CloseAudio();
     }
-    if (s_model) {
-        s_model->final();
-        delete s_model;
-        s_model = nullptr;
+
+    if (s_rt_model) {
+        s_rt_model->final();
+        delete s_rt_model;
+        s_rt_model = nullptr;
+    }
+    if (s_pb_model) {
+        s_pb_model->final();
+        delete s_pb_model;
+        s_pb_model = nullptr;
     }
     delete s_vl_ctx;
     s_vl_ctx  = nullptr;
@@ -413,49 +462,92 @@ void audio_close(void)
 }
 
 /*==============================================================
- * Stat register read (CPU thread)
- * Returns the cached value for byte offsets 0x20..0x36 (even only).
- * Offsets outside this range return 0.
+ * MMIO write (CPU thread)
+ * Mirrors write to both RT and PB models:
+ * - Queue write to PB model for audio callback processing
+ * - Advance RT model and process write immediately
  *==============================================================*/
+
+extern "C" void p8audio_verilated_mmio_write(uint8_t byte_addr, uint16_t data)
+{
+    /* Queue write for PB model first (audio thread reads, needs mutex) */
+    if (s_pb_model) {
+        pthread_mutex_lock(&s_pb_cmd_mutex);
+        s_pb_cmd_queue.push_back({byte_addr, data});
+        pthread_mutex_unlock(&s_pb_cmd_mutex);
+    }
+
+    /* Advance RT model by elapsed time (CPU thread, no mutex needed) */
+    advance_rt_model_by_time();
+
+    /* Process write immediately in RT model (real-time command processing) */
+    perform_mmio_transaction(s_rt_model, byte_addr, data);
+}
+
+/*==============================================================
+ * MMIO read (CPU thread)
+ * Reads from RT model only (no caching needed)
+ *==============================================================*/
+
 extern "C" uint16_t p8audio_verilated_mmio_read(uint8_t byte_offset)
 {
     if (byte_offset < 0x20 || byte_offset > 0x36 || (byte_offset & 1u))
         return 0;
-    pthread_mutex_lock(&s_queue_mutex);
-    if (s_queue_count > 0) {
-        flush_mmio_queue(false);
-        update_stat_cache();
-    }
-    pthread_mutex_unlock(&s_queue_mutex);
-    int idx = (byte_offset - 0x20) / 2;
-    pthread_mutex_lock(&s_stat_mutex);
-    uint16_t val = s_stat_cache[idx];
-    pthread_mutex_unlock(&s_stat_mutex);
-    return val;
+
+    /* Advance RT model by elapsed time (CPU thread, no mutex needed) */
+    advance_rt_model_by_time();
+
+    /* Read stat register directly from RT model */
+    uint16_t value = read_stat_register_direct(s_rt_model, byte_offset);
+
+    return value;
 }
 
 /*==============================================================
- * PCM read functions - advance model by one sample and return PCM value
+ * PCM read functions (CPU thread)
+ * Advance RT model by one sample and return PCM value
  *==============================================================*/
 
 extern "C" int16_t p8audio_verilated_read_pcm_left(void)
 {
-    pthread_mutex_lock(&s_model_mutex);
+    advance_rt_model_by_time();
 
-    /* Ensure model is up to date */
-    ensure_model_up_to_date();
-
-    /* Advance model by one sample and get PCM */
-    int16_t s_pcm = advance_one_sample();
-    int16_t result = s_pcm << (16 - PCM_WID);
-
-    pthread_mutex_unlock(&s_model_mutex);
-
-    return result;
+    /* Get current pcm_out from RT model */
+    int16_t s_pcm = get_model_sample(s_rt_model);
+    return s_pcm << (16 - PCM_WID);
 }
 
 extern "C" int16_t p8audio_verilated_read_pcm_right(void)
 {
     /* Right channel is the same as left for p8audio */
     return p8audio_verilated_read_pcm_left();
+}
+
+/*==============================================================
+ * SDL audio callback (PB model driven by SDL audio demand)
+ *==============================================================*/
+
+static void audio_callback_verilated(void *userdata, uint8_t *stream, int len)
+{
+    (void)userdata;
+    int16_t *buf     = (int16_t *)stream;
+    int      samples = len / (int)sizeof(int16_t);
+
+    if (s_pb_model) {
+        /* Drain PB queue into PB model (audio thread, mutex protects the queue) */
+        pthread_mutex_lock(&s_pb_cmd_mutex);
+        drain_pb_queue_to_model();
+        pthread_mutex_unlock(&s_pb_cmd_mutex);
+    }
+
+    /* Advance PB model and get samples in one loop */
+    for (int i = 0; i < samples; i++) {
+        if (s_pb_model) {
+            advance_one_sample_common(s_pb_model);
+            int16_t s_pcm = get_model_sample(s_pb_model);
+            buf[i] = s_pcm << (16 - PCM_WID);
+        } else {
+            buf[i] = 0;
+        }
+    }
 }

@@ -692,7 +692,7 @@ rw8 ReadHWByte(aw32 addr)
 static uint64_t utimer_latched = 0;
 static unsigned utimer_last_slice = 3;
 
-static uint64_t GetUserTimer(void)
+uint64_t GetUserTimer(void)
 {
 #ifdef PROFILER
 	// Use profiler cycle count for deterministic timing

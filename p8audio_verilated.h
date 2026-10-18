@@ -29,22 +29,25 @@ extern "C" {
  *            0x18 for SFX_CMD, 0x1C for MUSIC_CMD).
  * data:      16-bit write data.
  *
- * Thread-safe: may be called from any thread.  The write is queued and
- * applied in the SDL audio callback thread before the next batch of
- * samples is generated.
+ * Thread-safe: may be called from any thread.  The write is queued for
+ * the PB (playback) model and applied in the SDL audio callback thread.
+ * The RT (real-time) model is advanced immediately and processes the
+ * write synchronously in the calling thread.
+ *
+ * Both models receive the same write command to stay synchronized.
  */
 void p8audio_verilated_mmio_write(uint8_t byte_addr, uint16_t data);
 
 /*
- * Read a stat register from the Verilated p8audio model's shadow cache.
+ * Read a stat register from the Verilated p8audio model.
  *
  * byte_offset: byte offset within the p8audio register space (0x20..0x36,
  *              must be even), corresponding to ADDR_STAT46..ADDR_STAT57 in
  *              p8audio.sv (i.e. the value of addr - _P8AUDIO_BASE).
  * Returns:     16-bit register value; 0 if the offset is out of range.
  *
- * Thread-safe: reads from a shadow cache updated each sample by the SDL
- * audio thread.  Stale by at most ~45 µs (one sample period).
+ * Thread-safe: reads from the RT model (real-time) which is advanced on
+ * each MMIO operation. Returns current RT model state.
  */
 uint16_t p8audio_verilated_mmio_read(uint8_t byte_offset);
 
