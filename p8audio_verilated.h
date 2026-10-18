@@ -48,6 +48,17 @@ void p8audio_verilated_mmio_write(uint8_t byte_addr, uint16_t data);
  */
 uint16_t p8audio_verilated_mmio_read(uint8_t byte_offset);
 
+/*
+ * Read PCM output samples from the Verilated p8audio model.
+ *
+ * These functions advance the model by one sample and return the PCM value.
+ * They are thread-safe and can be called from any thread.
+ *
+ * Returns: 16-bit signed PCM sample (left or right channel)
+ */
+int16_t p8audio_verilated_read_pcm_left(void);
+int16_t p8audio_verilated_read_pcm_right(void);
+
 /* SDL audio lifecycle — implemented in p8audio_verilated.cpp */
 void p8audio_verilated_init(void);
 

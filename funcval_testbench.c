@@ -77,6 +77,10 @@ static double da_src_pos = 0.0;
 /* WAV recording register (0x380045) - write to start/stop recording */
 #define FUNCVAL_WAV_REC_REG   	 0x380045
 
+/* PCM audio registers (0x3800a0-0x3800a2) */
+#define FUNCVAL_PCM_L            0x3800A0
+#define FUNCVAL_PCM_R            0x3800A2
+
 /* Joystick registers (0x380061-0x380063) */
 #define FUNCVAL_JOY0             0x380061
 #define FUNCVAL_JOY1             0x380063
@@ -620,6 +624,12 @@ rw16 funcval_read_word(aw32 addr)
 {
 	int x, y;
 	uint16_t pixel;
+
+	/* PCM audio readback (0x3800A0-0x3800A2) */
+	if (addr == FUNCVAL_PCM_L || addr == FUNCVAL_PCM_R) {
+		extern int16_t p8audio_verilated_read_pcm_left(void);
+		return (uint16_t)p8audio_verilated_read_pcm_left();
+	}
 
 	/* VGA framebuffer readback */
 	if (funcval_addr_to_coords(addr, &x, &y) == 0) {

@@ -433,3 +433,29 @@ extern "C" uint16_t p8audio_verilated_mmio_read(uint8_t byte_offset)
     pthread_mutex_unlock(&s_stat_mutex);
     return val;
 }
+
+/*==============================================================
+ * PCM read functions - advance model by one sample and return PCM value
+ *==============================================================*/
+
+extern "C" int16_t p8audio_verilated_read_pcm_left(void)
+{
+    pthread_mutex_lock(&s_model_mutex);
+
+    /* Ensure model is up to date */
+    ensure_model_up_to_date();
+
+    /* Advance model by one sample and get PCM */
+    int16_t s_pcm = advance_one_sample();
+    int16_t result = s_pcm << (16 - PCM_WID);
+
+    pthread_mutex_unlock(&s_model_mutex);
+
+    return result;
+}
+
+extern "C" int16_t p8audio_verilated_read_pcm_right(void)
+{
+    /* Right channel is the same as left for p8audio */
+    return p8audio_verilated_read_pcm_left();
+}
